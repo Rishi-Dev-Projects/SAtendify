@@ -1,117 +1,111 @@
-# SAtendify — Frontend client console
+# 🎓 SAtendify — Smart Academic Attendance Portal
 
-SAtendify is a premium, state-of-the-art student attendance management portal built for a diploma engineering college. The client interface serves four roles: Administrator, Head of Department (HOD), Faculty, and Student.
+**SAtendify** is a state-of-the-art, high-performance Student Attendance Management System designed specifically for academic institutions. Built with a modern vanilla JavaScript architecture and Python Flask + Firebase Admin SDK backend, SAtendify provides tailored consoles for four distinct user roles: **System Administrator**, **Head of Department (HOD)**, **Faculty Member**, and **Student**.
 
 ---
 
-## 🚀 Getting Started & Local Testing
+## ✨ Key Features & Enhancements
 
-Since SAtendify uses modern **ES6 Javascript Modules** (`type="module"`), files must be served from a web host server to pass CORS security controls rather than opened directly as static `file:///` paths.
+### 🛡️ Role-Based Portals & Dashboards
+- **System Administrator Console** (`admin.html`): Manage subject master lists, departmental staff directories, student enrollment profiles, dynamic timetable slots, institutional attendance logs, and system configuration.
+- **Head of Department (HOD) Dashboard** (`hod.html`): Departmental analytics, faculty teaching load assignments, substitute proxy audits, student rosters, timetable master grid, and register logs.
+- **Faculty Dashboard** (`faculty.html`): Today's timetable schedule, attendance roster marking pane with 48-hour edit locks, substitute proxy lecture allocation system, student directory, and attendance logs.
+- **Student Portal** (`student.html`): Real-time overall attendance ratio, 75% academic eligibility status indicator, subject breakdown with visual progress fill bars, interactive attendance ledger, weekly trends, class schedule, and Roll Number + Date of Birth (`DDMMYYYY`) credentials login.
 
-A pre-packaged server script is provided. Double-click the launcher script or run standard commands:
+### ⚡ Substitute / Proxy Lecture Allocation System
+- **Faculty Absence Delegation**: Faculty members on leave can assign scheduled lectures for a target date to a substitute professor in their department.
+- **HOD Proxy Management**: HODs can assign and audit proxy substitute lectures across the department.
+- **Proxy Roster Marking**: Proxy professors see assigned classes on their daily timeline marked with `⚡ Proxy (Covering for Prof. X)` and gain authorization to take attendance for the slot.
 
-### 1. Launch local server
-To spin up a light server, run this in PowerShell or Command Prompt inside the directory:
+### 🆔 Student Credential Login (Roll No + DOB)
+- **Student Sign-In**: Removed email requirements for students. Students log in using their **Roll Number** (e.g., `23IT01`) and **Date of Birth** in `DDMMYYYY` format (e.g., `15082004`).
+- **Complete Employee ID Removal**: Cleaned up legacy `Employee ID` fields across forms, tables, modals, seeds, and API payloads for staff.
+
+### 📊 Attendance Registers & Analytics
+- **Indexed Registers & Visual Meters**: Clean table indexing (`#`), monospace timestamps, subject code tags, and percentage progress fill bars across all consoles.
+- **SVG Design System**: Modern dark-gradient themes (`linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)`), glassmorphism, responsive drawer navigation, zero emojis, and pure SVG icons.
+
+---
+
+## 🚀 Getting Started & Local Setup
+
+### Prerequisites
+- Python 3.10+
+- Flask & Firebase Admin SDK
+
+### 1. Launch Backend API Server
+```bash
+cd backend
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# Install requirements
+pip install -r requirements.txt
+# Run Flask app
+python app.py
+```
+The Flask backend runs on **[http://localhost:8000](http://localhost:8000)**.
+
+### 2. Frontend Development Server
+Since SAtendify uses modern **ES6 JavaScript Modules** (`type="module"`), run a local HTTP server from the root directory:
 ```bash
 py -m http.server 8000
 ```
-Then visit: **[http://localhost:8000](http://localhost:8000)** in your browser.
+Open **[http://localhost:8000](http://localhost:8000)** in your web browser.
 
 ---
 
-## 🔑 Demo testing accounts (Pre-populated)
+## 🔑 Demo Access Credentials
 
-Inside the login screen, a **Developer Quick Switcher** panel allows you to bypass typing credentials. Clicking any account pre-fills credentials and signs in automatically:
+The login interface includes a **Developer Quick Switcher** panel for instant single-click sign-in:
 
-| Academic Profile / Role | Email Account | Mock Password |
-| :--- | :--- | :--- |
-| **System Admin** | `admin@satendify.edu` | (Type anything or click switcher) |
-| **IT HOD** | `hod.it@satendify.edu` | (Type anything or click switcher) |
-| **Faculty (DBMS)** | `fac.dbms@satendify.edu` | (Type anything or click switcher) |
-| **IT Student (Sem 4)** | `std-23it01@satendify.edu` | (Type anything or click switcher) |
-
-*Note: In local mock mode, any password will bypass the validation checks. Password input field is required by forms validations.*
+| Role / Profile | Identity / Roll No | Password / DOB | Console URL |
+| :--- | :--- | :--- | :--- |
+| **System Admin** | `admin@satendify.edu` | `admin123` | `/admin.html` |
+| **IT HOD** | `hod.it@satendify.edu` | `hod123` | `/hod.html` |
+| **DBMS Faculty** | `fac.dbms@satendify.edu` | `fac123` | `/faculty.html` |
+| **IT Student (Sem 4)** | `23IT01` | `15082004` | `/student.html` |
 
 ---
 
-## ⚙️ Connecting to a Live Backend (Flask/FastAPI)
-
-Swap from client-side mocked localStorage to a live Firebase Auth and FastAPI/Flask backend server in one step. Open `js/config.js` and modify these keys:
-
-```javascript
-export const CONFIG = {
-  // 1. Toggle this key to false
-  USE_MOCK: false,
-
-  // 2. Point to your live backend REST API URL
-  API_BASE_URL: 'https://api.yourcollege.edu/api',
-
-  // 3. Configure your production Firebase Web SDK Configuration
-  FIREBASE_CONFIG: {
-    apiKey: "YOUR_PRODUCTION_API_KEY",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "1234567890",
-    appId: "your-app-id"
-  }
-};
-```
-
----
-
-## 🏛 Directory Architecture Details
+## 🏛️ Repository Architecture
 
 ```text
 SAtendify/
+├── backend/
+│   ├── blueprints/
+│   │   ├── admin.py       # Admin CRUD & system configuration API routes
+│   │   ├── auth.py        # Authentication & profile resolution API routes
+│   │   ├── faculty.py     # Faculty timetable, roster marking, & proxy API routes
+│   │   ├── hod.py         # HOD department analytics & assignment API routes
+│   │   └── student.py     # Student attendance metrics & timetable API routes
+│   ├── app.py             # Flask application entry point
+│   ├── config.py          # Firestore database & Firebase Admin SDK initialization
+│   ├── decorators.py      # Bearer token verification & role authorization middleware
+│   ├── seed.py            # Initial database seeder script
+│   └── requirements.txt   # Python dependency manifest
 ├── css/
-│   └── style.css          # Design System token declarations and global CSS styles
+│   └── style.css          # Core design system tokens, utility classes, and global styles
 ├── js/
-│   ├── config.js          # API switch toggles and Firebase configuration variables
-│   ├── mockData.js        # Default seed database initializer (Localstorage persistence)
-│   ├── auth.js            # Firebase Authentication + Mock Auth sessions router
-│   ├── api.js             # Shared fetch client wrapper, status Toast notifications, and Mock CRUD APIs 
-│   ├── main.js            # Shared Chrome chrome drawers (sidebar and headers) renderer
-│   ├── admin.js           # Admin Dashboard Tab panels (Analytics, Subjects CRUD, Users CRUD, Timetables)
-│   ├── hod.js             # HOD scoped Department panel (Faculty assignment, Timetable grid, Take attendance)
-│   ├── faculty.js         # Faculty core pages (Availability timeline, Roster marking sheets, 48h history)
-│   └── student.js         # Student profile analytics (Radial wheel progress, Ledger details, ChartJS graphs)
-├── index.html             # Route Gateway gatekeeper (Auto session check direction)
-├── login.html             # Login screen panel + Developer Switcher + Forgot password panel
-├── 403.html               # 403 Access Denied layout wrapper
-├── 404.html               # 404 Not Found error layout wrapper
-├── admin.html             # Admin chrome workspace
-├── hod.html               # HOD chrome workspace
-├── faculty.html           # Faculty chrome workspace
-├── student.html           # Student chrome workspace
-└── run.bat                # Shortcut windows batch script to open server
+│   ├── config.js          # API endpoints & Firebase SDK configuration
+│   ├── mockData.js        # Offline fallback database seeds
+│   ├── auth.js            # Authentication sessions router & Roll No + DOB validator
+│   ├── api.js             # API fetch client wrapper & toast notifications manager
+│   ├── main.js            # Navigation drawer & chrome header manager
+│   ├── admin.js           # Admin console controller
+│   ├── hod.js             # HOD console controller
+│   ├── faculty.js         # Faculty console & proxy management controller
+│   └── student.js         # Student portal analytics controller
+├── index.html             # Application gateway router
+├── login.html             # Login panel with Developer Quick Switcher
+├── admin.html             # Admin portal view
+├── hod.html               # HOD portal view
+├── faculty.html           # Faculty portal view
+├── student.html           # Student portal view
+└── README.md              # Project documentation
 ```
 
 ---
 
-## ⚡ Key Workflows Implemented
-
-### 1. Roster Attendance Marking (Faculty/HOD)
-- Today's timetable slots are computed relative to real system time. Future periods are locked/greyed out with helpful labels (e.g. "Available at 11:15 AM").
-- Roster details load dynamically. Clicking "Mark all Present" / "Mark all Absent" modifies rows.
-- Large touch buttons toggle individual student rows between Present (Green), Absent (Red), and On Leave (Yellow) statuses.
-- Sticky margins submit student registers, writing records to historical session arrays.
-
-### 2. Verification History Locks (Faculty)
-- Faculty can filter logs by subject code and target dates.
-- Interactive Modify triggers allow editing submissions.
-- **48-Hour Business Logic:** If a logged entry is older than 48 hours, editing actions are disabled.
-
-### 3. Student Attendance Report Card
-- Overall attendance is visualized as a radial circle percentage.
-- **Academic minimum (75%) conditional formatting:** Under 75% displays a red advisory banner highlighting final exam restrictions. Above 75% displays a green clearance indicator.
-- Subject list items display progress percentage bar colors matching status (emerald vs red). Collapsing accordion triggers render granular dates lists ledger rows.
-- Live **Chart.js HTML5 canvases** draw Subject histograms and Week-by-week trend indices.
-- CSV export logs can be compiled in the browser and downloaded with a single click.
-
----
-
-## ⚠️ Known Mock Limitations
-
-1. **Timetable Grid Collision:** When schedule classes are added, collision scripts verify that the target professor is not scheduled elsewhere and that the class room is free. Live multi-device tests may allow racing if done outside a transactional server.
-2. **Session Persistence:** Disabling mock mode wipes local storage buffers. The real backend database registers are expected to store subjects, classes, rules, and timetable schemas permanently.
+## 📄 License
+This project is developed for academic institutional management. All rights reserved.
