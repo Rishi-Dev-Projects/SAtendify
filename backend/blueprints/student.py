@@ -25,6 +25,9 @@ def get_student_timetable():
                         .where('department', '==', dept)\
                         .where('semester', '==', int(sem))\
                         .where('division', '==', div).get()
+        # Batch pre-fetch subjects and users maps
+        subs_dict = {doc.id: doc.to_dict() for doc in db.collection('subjects').stream()}
+        users_dict = {doc.id: doc.to_dict().get('name', 'Professor') for doc in db.collection('users').stream()}
                         
         results = []
         for doc in slots_snaps:
@@ -32,13 +35,8 @@ def get_student_timetable():
             sub_id = slot.get('subjectId')
             faculty_id = slot.get('facultyId')
             
-            # Enrich Subject Details
-            sub_snap = db.collection('subjects').document(sub_id).get()
-            sub_info = sub_snap.to_dict() if sub_snap.exists else {"name": "Unknown", "code": ""}
-            
-            # Enrich Faculty Name
-            fac_snap = db.collection('users').document(faculty_id).get()
-            fac_name = fac_snap.to_dict().get('name', 'Professor') if fac_snap.exists else 'Professor'
+            sub_info = subs_dict.get(sub_id, {"name": "Unknown", "code": ""})
+            fac_name = users_dict.get(faculty_id, 'Professor')
             
             results.append({
                 "id": doc.id,
@@ -78,6 +76,9 @@ def get_student_attendance():
                        .where('semester', '==', int(sem)).get()
                        
         subjects_map = {doc.id: dict(doc.to_dict(), id=doc.id) for doc in subs_snaps}
+        
+        # Batch pre-fetch users dictionary for faculty names
+        users_dict = {doc.id: doc.to_dict().get('name', 'Assigned Professor') for doc in db.collection('users').stream()}
         
         # 2. Fetch all attendance logs recorded for this class semester and division
         att_snaps = db.collection('attendance')\
@@ -142,13 +143,9 @@ def get_student_attendance():
         for sid, meta in sub_metrics.items():
             sub_info = subjects_map[sid]
             
-            # Retrieve Teacher Name
+            # Retrieve Teacher Name from in-memory pre-fetched users dictionary
             fac_id = sub_info.get('facultyId')
-            fac_name = "Assigned Professor"
-            if fac_id:
-                fac_ref = db.collection('users').document(fac_id).get()
-                if fac_ref.exists:
-                    fac_name = fac_ref.to_dict().get('name', 'Assigned Professor')
+            fac_name = users_dict.get(fac_id, "Assigned Professor") if fac_id else "Assigned Professor"
                     
             p = round((meta["attended"] / meta["total"] * 100), 1) if meta["total"] > 0 else 100.0
             

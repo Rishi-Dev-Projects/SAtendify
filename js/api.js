@@ -108,8 +108,23 @@ if (typeof document !== 'undefined' && !document.getElementById('toast-animation
   document.head.appendChild(styles);
 }
 
+// In-Memory API Cache for ultra-fast tab switches
+const apiCache = new Map();
+const CACHE_TTL_MS = 20000; // 20 seconds TTL
+
+export function clearApiCache() {
+  apiCache.clear();
+}
+
 // Main API Fetch Wrapper
 export async function apiFetch(endpoint, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+
+  // Invalidate cache on data mutation requests (POST, PUT, DELETE)
+  if (method !== 'GET') {
+    clearApiCache();
+  }
+
   // 1. If USING MOCK MODE: Intercept routes locally
   if (CONFIG.USE_MOCK) {
     await sleep(CONFIG.MOCK_DELAY);
@@ -126,6 +141,15 @@ export async function apiFetch(endpoint, options = {}) {
       console.error('Mock API system exception:', e);
       showToast(e.message, 'error');
       return { success: false, error: e.message };
+    }
+  }
+
+  // Check in-memory cache for GET requests
+  const cacheKey = endpoint;
+  if (method === 'GET' && !options.skipCache) {
+    const cached = apiCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+      return cached.data;
     }
   }
 
@@ -160,6 +184,8 @@ export async function apiFetch(endpoint, options = {}) {
     const payload = await response.json();
     if (!payload.success) {
       showToast(payload.error || 'Server error', 'error');
+    } else if (method === 'GET') {
+      apiCache.set(cacheKey, { timestamp: Date.now(), data: payload });
     }
     return payload; // Returns { success: true/false, data: ... , error: ... }
   } catch (error) {

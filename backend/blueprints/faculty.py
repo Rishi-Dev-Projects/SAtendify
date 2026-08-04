@@ -27,37 +27,35 @@ def get_faculty_today_timetable():
         # 1. Query regular timetable slots for this teacher
         slots_snap = db.collection('timetables').where('facultyId', '==', uid).get()
         
+        # Batch pre-fetch subjects map, today's attendance logs, and active proxies
+        subs_dict = {doc.id: doc.to_dict() for doc in db.collection('subjects').stream()}
+        atts_today_set = set(doc.id for doc in db.collection('attendance').where('date', '==', today_date_str).stream())
+        proxies_today_list = [p.to_dict() for p in db.collection('proxy_assignments').where('date', '==', today_date_str).where('status', '==', 'active').stream()]
+
         results = []
         for doc in slots_snap:
             slot = doc.to_dict()
             slot_id = doc.id
             is_today = (slot.get('day') == today_wday)
             
-            # Retrieve Subject metadata
+            # Retrieve Subject metadata from pre-fetched map
             sub_id = slot.get('subjectId')
-            sub_snap = db.collection('subjects').document(sub_id).get()
-            sub_info = sub_snap.to_dict() if sub_snap.exists else {"name": "Unknown", "code": ""}
+            sub_info = subs_dict.get(sub_id, {"name": "Unknown", "code": ""})
             
             # Check if attendance registry was already submitted today for this slot
             att_id = f"att-{slot_id}-{today_date_str}"
-            att_snap = db.collection('attendance').document(att_id).get()
-            is_submitted = att_snap.exists
+            is_submitted = (att_id in atts_today_set)
             
             # Check if this slot has a proxy assigned for today
-            proxy_snap = db.collection('proxy_assignments')\
-                           .where('timetableId', '==', slot_id)\
-                           .where('date', '==', today_date_str)\
-                           .where('status', '==', 'active').get()
-            
+            p_match = next((p for p in proxies_today_list if p.get('timetableId') == slot_id), None)
             has_proxy = False
             proxy_info = None
-            if len(proxy_snap) > 0:
+            if p_match:
                 has_proxy = True
-                p_data = proxy_snap[0].to_dict()
                 proxy_info = {
-                    "proxyFacultyId": p_data.get('proxyFacultyId'),
-                    "proxyFacultyName": p_data.get('proxyFacultyName'),
-                    "reason": p_data.get('reason')
+                    "proxyFacultyId": p_match.get('proxyFacultyId'),
+                    "proxyFacultyName": p_match.get('proxyFacultyName'),
+                    "reason": p_match.get('reason')
                 }
             
             results.append({

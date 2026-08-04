@@ -40,27 +40,6 @@ def init_firebase():
                 raise e
     
     db = firestore.client()
-    
-    # Auto-repair admin role if it was accidentally modified/wiped
-    try:
-        admin_ref = db.collection('users').document('usr-admin')
-        admin_snap = admin_ref.get()
-        if admin_snap.exists:
-            admin_data = admin_snap.to_dict()
-            if admin_data.get('role') != 'admin':
-                admin_ref.update({"role": "admin"})
-                print("Auto-Repair: Successfully restored admin role for usr-admin in Firestore.")
-        else:
-            # Check by email in case uid is different
-            admin_query = db.collection('users').where('email', '==', 'admin@satendify.edu').stream()
-            for doc in admin_query:
-                doc_data = doc.to_dict()
-                if doc_data.get('role') != 'admin':
-                    doc.reference.update({"role": "admin"})
-                    print(f"Auto-Repair: Successfully restored admin role for user doc {doc.id} in Firestore.")
-    except Exception as err:
-        print(f"Warning: Admin role auto-repair migration failed: {err}")
-        
     return db
 
 # Execute initialisation
