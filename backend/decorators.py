@@ -1,7 +1,12 @@
+import time
 from functools import wraps
 from flask import request, jsonify, g
 from firebase_admin import auth
 from config import db
+
+# In-memory user profile cache (2 minutes TTL) to eliminate repetitive Firestore auth queries
+USER_CACHE = {}
+CACHE_TTL = 120
 
 def require_auth(roles=None):
     """
@@ -20,6 +25,18 @@ def require_auth(roles=None):
             
             if db is None:
                 return jsonify({"success": False, "error": "Database driver offline, cannot check authorization."}), 500
+
+            # 0. Check in-memory cache first
+            if token in USER_CACHE:
+                cached_profile, cached_uid, ts = USER_CACHE[token]
+                if time.time() - ts < CACHE_TTL:
+                    g.current_user = dict(cached_profile)
+                    g.current_user['uid'] = cached_uid
+                    if roles and cached_profile.get('role') not in roles:
+                        return jsonify({"success": False, "error": f"Access forbidden."}), 403
+                    return f(*args, **kwargs)
+                else:
+                    del USER_CACHE[token]
 
             uid = None
             user_profile = None
@@ -49,7 +66,6 @@ def require_auth(roles=None):
                     if user_doc.exists:
                         user_profile = user_doc.to_dict()
                 except Exception as e:
-                    # Fallback lookup: try treating token directly as user document id
                     try:
                         user_doc = db.collection('users').document(token).get()
                         if user_doc.exists:
@@ -60,6 +76,9 @@ def require_auth(roles=None):
 
             if not user_profile:
                 return jsonify({"success": False, "error": "User profile not found in database records."}), 403
+
+            # Cache successful profile lookup
+            USER_CACHE[token] = (user_profile, uid, time.time())
 
             # Check status
             if user_profile.get('status') == 'suspended' or user_profile.get('status') == 'inactive':

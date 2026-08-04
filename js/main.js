@@ -82,6 +82,27 @@ function renderSidebar(user, activeTab) {
     </aside>
   `;
 
+  // Bind SPA link clicks to prevent unnecessary full browser reloads
+  sidebarContainer.querySelectorAll('.nav-links a').forEach(a => {
+    a.addEventListener('click', (e) => {
+      const href = a.getAttribute('href');
+      if (!href) return;
+      const url = new URL(href, window.location.origin);
+      if (url.pathname === window.location.pathname) {
+        e.preventDefault();
+        const tab = url.searchParams.get('tab');
+        window.history.pushState({}, '', href);
+
+        // Update active link styling
+        sidebarContainer.querySelectorAll('.nav-item').forEach(li => li.classList.remove('active'));
+        a.parentElement.classList.add('active');
+
+        // Dispatch tabchange event for SPA render
+        window.dispatchEvent(new CustomEvent('tabchange', { detail: { tab } }));
+      }
+    });
+  });
+
   // Bind Logout
   document.getElementById('sidebar-logout').addEventListener('click', async () => {
     if (confirm('Are you sure you want to secure log out of SAtendify?')) {

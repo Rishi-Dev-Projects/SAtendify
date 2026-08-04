@@ -6,7 +6,9 @@ import { apiFetch, showToast } from './api.js';
 // Route guard validation
 const user = guardRoute(['admin']);
 if (user) {
-  window.addEventListener('DOMContentLoaded', initAdminDashboard);
+  window.addEventListener('DOMContentLoaded', () => initAdminDashboard());
+  window.addEventListener('popstate', () => initAdminDashboard());
+  window.addEventListener('tabchange', (e) => initAdminDashboard(e.detail ? e.detail.tab : null));
 }
 
 // Global modal elements reference
@@ -29,7 +31,7 @@ function getBatchNamesForSemester(semester, maxBatches = 2) {
   return list;
 }
 
-async function initAdminDashboard() {
+async function initAdminDashboard(forcedTab = null) {
   // Bind modal DOM references
   modalBackdrop = document.getElementById('admin-modal');
   modalTitle = document.getElementById('modal-panel-title');
@@ -51,7 +53,7 @@ async function initAdminDashboard() {
 
   // Parse active tab parameter
   const urlParams = new URLSearchParams(window.location.search);
-  const activeTab = urlParams.get('tab') || 'overview';
+  const activeTab = forcedTab || urlParams.get('tab') || 'overview';
 
   // Render navbar navigation chrome
   initializeChrome(activeTab, getPageTitleForTab(activeTab));

@@ -6,7 +6,9 @@ import { apiFetch, showToast } from './api.js';
 // Route guard validation
 const user = guardRoute(['faculty']);
 if (user) {
-  window.addEventListener('DOMContentLoaded', initFacultyDashboard);
+  window.addEventListener('DOMContentLoaded', () => initFacultyDashboard());
+  window.addEventListener('popstate', () => initFacultyDashboard());
+  window.addEventListener('tabchange', (e) => initFacultyDashboard(e.detail ? e.detail.tab : null));
 }
 
 // Global modal references
@@ -29,7 +31,7 @@ function getBatchNamesForSemester(semester, maxBatches = 2) {
   return list;
 }
 
-async function initFacultyDashboard() {
+async function initFacultyDashboard(forcedTab = null) {
   modalBackdrop = document.getElementById('faculty-modal');
   modalTitle = document.getElementById('modal-panel-title');
   modalClose = document.getElementById('modal-close');
@@ -47,7 +49,7 @@ async function initFacultyDashboard() {
   }
 
   const urlParams = new URLSearchParams(window.location.search);
-  const activeTab = urlParams.get('tab') || 'timetable-today';
+  const activeTab = forcedTab || urlParams.get('tab') || 'timetable-today';
 
   initializeChrome(activeTab, getPageTitleForTab(activeTab));
 

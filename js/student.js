@@ -6,16 +6,18 @@ import { apiFetch, showToast } from './api.js';
 // Route guard validation
 const user = guardRoute(['student']);
 if (user) {
-  window.addEventListener('DOMContentLoaded', initStudentDashboard);
+  window.addEventListener('DOMContentLoaded', () => initStudentDashboard());
+  window.addEventListener('popstate', () => initStudentDashboard());
+  window.addEventListener('tabchange', (e) => initStudentDashboard(e.detail ? e.detail.tab : null));
 }
 
 // Chart pointers to clean up on reload/redraw
 let subjectChartInstance = null;
 let trendChartInstance = null;
 
-async function initStudentDashboard() {
+async function initStudentDashboard(forcedTab = null) {
   const urlParams = new URLSearchParams(window.location.search);
-  const activeTab = urlParams.get('tab') || 'overview';
+  const activeTab = forcedTab || urlParams.get('tab') || 'overview';
 
   initializeChrome(activeTab, getPageTitleForTab(activeTab));
 

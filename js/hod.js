@@ -6,7 +6,9 @@ import { apiFetch, showToast } from './api.js';
 // Route guard validation
 const user = guardRoute(['hod']);
 if (user) {
-  window.addEventListener('DOMContentLoaded', initHODDashboard);
+  window.addEventListener('DOMContentLoaded', () => initHODDashboard());
+  window.addEventListener('popstate', () => initHODDashboard());
+  window.addEventListener('tabchange', (e) => initHODDashboard(e.detail ? e.detail.tab : null));
 }
 
 // Global modal references
@@ -29,7 +31,7 @@ function getBatchNamesForSemester(semester, maxBatches = 2) {
   return list;
 }
 
-async function initHODDashboard() {
+async function initHODDashboard(forcedTab = null) {
   modalBackdrop = document.getElementById('hod-modal');
   modalTitle = document.getElementById('modal-panel-title');
   modalClose = document.getElementById('modal-close');
@@ -48,7 +50,7 @@ async function initHODDashboard() {
   modalForm.addEventListener('submit', handleModalSubmit);
 
   const urlParams = new URLSearchParams(window.location.search);
-  const activeTab = urlParams.get('tab') || 'overview';
+  const activeTab = forcedTab || urlParams.get('tab') || 'overview';
 
   initializeChrome(activeTab, getPageTitleForTab(activeTab));
 
