@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | SAtendify</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- ChartJS CDN for premium visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* Admin specific style tweaks */
+    .timetable-builder-controls,
+    .history-filter-controls {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      background: white;
+      padding: 16px 24px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      align-items: flex-end;
+    }
+
+    .timetable-builder-controls .form-group,
+    .history-filter-controls .form-group {
+      margin-bottom: 0;
+      flex-grow: 1;
+      min-width: 140px;
+    }
+
+    @media (max-width: 768px) {
+      .timetable-builder-controls,
+      .history-filter-controls {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 16px;
+        gap: 12px;
+      }
+      .timetable-builder-controls .form-group,
+      .history-filter-controls .form-group {
+        width: 100%;
+        min-width: 0;
+      }
+      .timetable-builder-controls button,
+      .history-filter-controls button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="app-container">
+    <!-- Sidebar navigation placeholder -->
+    <div id="sidebar-container"></div>
+
+    <!-- Main pane -->
+    <div class="app-main">
+      <div id="header-container"></div>
+
+      <!-- Main Content pane rendered dynamically -->
+      <div id="dashboard-content" class="dashboard-content">
+        <!-- Render skeleton elements while fetching data -->
+        <div class="stats-grid">
+          <div class="stat-card"><span class="skeleton-bar" style="width: 80px;"></span><span class="skeleton-bar"
+              style="width: 150px; height: 32px;"></span></div>
+          <div class="stat-card"><span class="skeleton-bar" style="width: 80px;"></span><span class="skeleton-bar"
+              style="width: 150px; height: 32px;"></span></div>
+          <div class="stat-card"><span class="skeleton-bar" style="width: 80px;"></span><span class="skeleton-bar"
+              style="width: 150px; height: 32px;"></span></div>
+          <div class="stat-card"><span class="skeleton-bar" style="width: 80px;"></span><span class="skeleton-bar"
+              style="width: 150px; height: 32px;"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Modal Dialogue Backdrop -->
+  <div id="admin-modal" class="modal-backdrop">
+    <div class="modal-window" id="modal-window">
+      <div class="modal-title-bar">
+        <h4 id="modal-panel-title">Asset Form</h4>
+        <button id="modal-close" class="modal-close-btn">&times;</button>
+      </div>
+      <form id="modal-form-element">
+        <div class="modal-content-panel" id="modal-form-content">
+          <!-- Populated dynamically -->
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-save-btn">Save Asset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Core Page logic -->
+  <script type="module" src="js/admin.js"></script>
+
+</body>
+
+</html>

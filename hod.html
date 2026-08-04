@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HOD Department Console | SAtendify</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .assignment-card {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .faculty-list-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .history-filter-controls {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      background: white;
+      padding: 16px 20px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      align-items: flex-end;
+    }
+
+    .history-filter-controls .form-group {
+      margin-bottom: 0;
+      flex-grow: 1;
+      min-width: 140px;
+    }
+
+    @media (max-width: 768px) {
+      .assignment-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .assignment-card button {
+        width: 100%;
+      }
+      .history-filter-controls {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 16px;
+        gap: 12px;
+      }
+      .history-filter-controls .form-group {
+        width: 100%;
+        min-width: 0;
+      }
+      .history-filter-controls button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+
+    <div class="app-main">
+      <div id="header-container"></div>
+
+      <!-- HOD Content Panel -->
+      <div id="dashboard-content" class="dashboard-content">
+        <div class="stats-grid">
+          <div class="stat-card"><span class="skeleton-bar" style="width: 80px;"></span><span class="skeleton-bar"
+              style="width: 150px; height: 32px;"></span></div>
+          <div class="stat-card"><span class="skeleton-bar" style="width: 80px;"></span><span class="skeleton-bar"
+              style="width: 150px; height: 32px;"></span></div>
+          <div class="stat-card"><span class="skeleton-bar" style="width: 80px;"></span><span class="skeleton-bar"
+              style="width: 150px; height: 32px;"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Modal dialogue backdrop -->
+  <div id="hod-modal" class="modal-backdrop">
+    <div class="modal-window" id="modal-window">
+      <div class="modal-title-bar">
+        <h4 id="modal-panel-title">Asset Form</h4>
+        <button id="modal-close" class="modal-close-btn">&times;</button>
+      </div>
+      <form id="modal-form-element">
+        <div class="modal-content-panel" id="modal-form-content">
+          <!-- Populated dynamically -->
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-save-btn">Save Allocation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Javascript logic modules -->
+  <script type="module" src="js/hod.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Portal | SAtendify</title>
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- ChartJS CDN for premium visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* Student specific style customization */
+    .student-dashboard-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+    }
+    
+    .charts-row-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 992px) {
+      .student-dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+      .charts-row-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+    
+    <div class="app-main">
+      <div id="header-container"></div>
+      
+      <!-- Student Dashboard Workspace Content -->
+      <div id="dashboard-content" class="dashboard-content">
+        <div class="panel-card skeleton-card" style="margin-bottom: 24px; padding: 22px 28px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; border: none; border-radius: var(--radius-lg);">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+            <div style="display: flex; align-items: center; gap: 18px;">
+              <div class="skeleton-pulse" style="width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,0.12);"></div>
+              <div>
+                <div class="skeleton-pulse" style="width: 180px; height: 22px; border-radius: 6px; background: rgba(255,255,255,0.15); margin-bottom: 8px;"></div>
+                <div class="skeleton-pulse" style="width: 260px; height: 14px; border-radius: 4px; background: rgba(255,255,255,0.1);"></div>
+              </div>
+            </div>
+            <div class="skeleton-pulse" style="width: 140px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.12);"></div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+          <div class="panel-card" style="padding: 24px; background: var(--bg-secondary); height: 100px;">
+            <div class="skeleton-pulse" style="width: 100px; height: 14px; border-radius: 4px; margin-bottom: 12px; background: var(--border-color);"></div>
+            <div class="skeleton-pulse" style="width: 70px; height: 32px; border-radius: 6px; background: var(--border-color);"></div>
+          </div>
+          <div class="panel-card" style="padding: 24px; background: var(--bg-secondary); height: 100px;">
+            <div class="skeleton-pulse" style="width: 100px; height: 14px; border-radius: 4px; margin-bottom: 12px; background: var(--border-color);"></div>
+            <div class="skeleton-pulse" style="width: 70px; height: 32px; border-radius: 6px; background: var(--border-color);"></div>
+          </div>
+          <div class="panel-card" style="padding: 24px; background: var(--bg-secondary); height: 100px;">
+            <div class="skeleton-pulse" style="width: 100px; height: 14px; border-radius: 4px; margin-bottom: 12px; background: var(--border-color);"></div>
+            <div class="skeleton-pulse" style="width: 70px; height: 32px; border-radius: 6px; background: var(--border-color);"></div>
+          </div>
+          <div class="panel-card" style="padding: 24px; background: var(--bg-secondary); height: 100px;">
+            <div class="skeleton-pulse" style="width: 100px; height: 14px; border-radius: 4px; margin-bottom: 12px; background: var(--border-color);"></div>
+            <div class="skeleton-pulse" style="width: 70px; height: 32px; border-radius: 6px; background: var(--border-color);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Primary Page Script Logic -->
+  <script type="module" src="js/student.js"></script>
+
+</body>
+</html>

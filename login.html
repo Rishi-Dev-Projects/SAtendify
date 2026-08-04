@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | SAtendify</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Firebase Client SDK (Compatibility Mode) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <style>
+    /* Custom inline additions for login screen */
+    .forgot-password-link {
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: var(--color-accent);
+      cursor: pointer;
+      display: inline-block;
+      margin-top: 4px;
+    }
+
+    .forgot-password-link:hover {
+      text-decoration: underline;
+    }
+
+    .panel-forgot-view {
+      display: none;
+    }
+
+    .brand-accent-line {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-success) 50%, var(--color-warning) 100%);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="login-screen-wrap">
+    <div class="login-window-container">
+
+      <!-- Login Role Tab Switcher -->
+      <div class="login-nav-tabs" id="login-tabs-wrap">
+        <button type="button" class="login-tab-btn active" id="tab-btn-staff">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          Staff & Admin
+        </button>
+        <button type="button" class="login-tab-btn" id="tab-btn-student">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          Student Portal
+        </button>
+      </div>
+
+      <!-- Normal Login Card Panel -->
+      <div id="login-form-view">
+        <div class="login-branding-header">
+          <div class="logo-wrapper">S</div>
+          <h2 id="login-panel-heading">Faculty & Admin Portal</h2>
+          <p id="login-panel-subheading">Smart attendance logs & academic console</p>
+          <div class="brand-accent-line"></div>
+        </div>
+
+        <!-- 1. Faculty / Admin Login Form -->
+        <div class="login-form-body" id="panel-staff-form">
+          <form id="form-login">
+            <div class="form-group">
+              <label for="login-email">Email Address</label>
+              <input type="email" id="login-email" class="form-control" placeholder="username@satendify.edu" required
+                autocomplete="email">
+            </div>
+
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label for="login-password">System Password</label>
+                <span class="forgot-password-link" id="trigger-forgot-view">Forgot password?</span>
+              </div>
+              <input type="password" id="login-password" class="form-control" placeholder="••••••••" required
+                autocomplete="current-password">
+            </div>
+
+            <button type="submit" id="btn-login-submit" class="btn btn-primary"
+              style="width: 100%; margin-top: 12px; padding: 12px;">
+              <span>Authenticate Staff Access</span> ➔
+            </button>
+          </form>
+        </div>
+
+        <!-- 2. Student Login Form (Roll Number + DOB DDMMYYYY) -->
+        <div class="login-form-body" id="panel-student-form" style="display: none;">
+          <form id="form-student-login">
+            <div class="form-group">
+              <label for="student-roll">Roll Number / Enrollment ID</label>
+              <input type="text" id="student-roll" class="form-control" placeholder="e.g. 23IT001" required
+                style="text-transform: uppercase;">
+            </div>
+
+            <div class="form-group">
+              <label for="student-dob">Date of Birth (DDMMYYYY)</label>
+              <input type="password" id="student-dob" class="form-control" placeholder="e.g. 15082004" required
+                maxlength="8" pattern="[0-9]{8}">
+              <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">
+                Format: 8 digits DDMMYYYY (e.g. 15082004). Managed by institution registrar.
+              </span>
+            </div>
+
+            <button type="submit" id="btn-student-submit" class="btn btn-primary"
+              style="width: 100%; margin-top: 12px; padding: 12px;">
+              <span>Student Sign-In</span> ➔
+            </button>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- Forgot Password Panel Sheet -->
+      <div id="forgot-form-view" class="panel-forgot-view">
+        <div class="login-branding-header">
+          <div class="logo-wrapper">S</div>
+          <h2>Reset Access Pin</h2>
+          <p>Please enter your registered staff email address</p>
+          <div class="brand-accent-line"></div>
+        </div>
+
+        <div class="login-form-body">
+          <form id="form-forgot">
+            <div class="form-group">
+              <label for="forgot-email">Account Email</label>
+              <input type="email" id="forgot-email" class="form-control" placeholder="username@satendify.edu" required>
+            </div>
+
+            <button type="submit" id="btn-forgot-submit" class="btn btn-primary"
+              style="width: 100%; margin-top: 12px; padding: 12px;">
+              Send Recovery Email Link
+            </button>
+          </form>
+
+          <div style="margin-top: 24px; text-align: center;">
+            <span class="forgot-password-link" id="trigger-login-view" style="font-size: 0.95rem;">← Back to
+              login</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { login, studentLogin } from './js/auth.js';
+    import { showToast } from './js/api.js';
+
+    const loginView = document.getElementById('login-form-view');
+    const forgotView = document.getElementById('forgot-form-view');
+    const tabsWrap = document.getElementById('login-tabs-wrap');
+
+    const tabStaff = document.getElementById('tab-btn-staff');
+    const tabStudent = document.getElementById('tab-btn-student');
+    const panelStaff = document.getElementById('panel-staff-form');
+    const panelStudent = document.getElementById('panel-student-form');
+
+    const heading = document.getElementById('login-panel-heading');
+    const subheading = document.getElementById('login-panel-subheading');
+
+    // Tab Switchers
+    tabStaff.addEventListener('click', () => {
+      tabStaff.classList.add('active');
+      tabStudent.classList.remove('active');
+      panelStaff.style.display = 'block';
+      panelStudent.style.display = 'none';
+      heading.textContent = 'Faculty & Admin Portal';
+      subheading.textContent = 'Smart attendance logs & academic console';
+    });
+
+    tabStudent.addEventListener('click', () => {
+      tabStudent.classList.add('active');
+      tabStaff.classList.remove('active');
+      panelStudent.style.display = 'block';
+      panelStaff.style.display = 'none';
+      heading.textContent = 'Student Access Portal';
+      subheading.textContent = 'Enter Roll Number & DOB (DDMMYYYY)';
+    });
+
+    // View Switchers
+    document.getElementById('trigger-forgot-view').addEventListener('click', () => {
+      loginView.style.display = 'none';
+      tabsWrap.style.display = 'none';
+      forgotView.style.display = 'block';
+    });
+
+    document.getElementById('trigger-login-view').addEventListener('click', () => {
+      forgotView.style.display = 'none';
+      tabsWrap.style.display = 'flex';
+      loginView.style.display = 'block';
+    });
+
+    // Handle Staff Login Submit
+    const formLogin = document.getElementById('form-login');
+    const submitBtn = document.getElementById('btn-login-submit');
+
+    formLogin.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value.trim();
+
+      if (!email || !password) {
+        showToast('Please insert all valid credentials.', 'warning');
+        return;
+      }
+
+      const originalText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span class="skeleton-bar" style="width: 80px; height: 16px; margin: 0; background: rgba(255,255,255,0.4)"></span>`;
+
+      const result = await login(email, password);
+
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+
+      if (result.success) {
+        showToast(`Authentication success! Welcome, ${result.user.name}`, 'success');
+        setTimeout(() => {
+          window.location.href = `${result.user.role}.html`;
+        }, 800);
+      } else {
+        showToast(result.error || 'Authentication credential mismatch.', 'error');
+      }
+    });
+
+    // Handle Student Login Submit
+    const formStudent = document.getElementById('form-student-login');
+    const submitStudentBtn = document.getElementById('btn-student-submit');
+
+    formStudent.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const roll = document.getElementById('student-roll').value.trim();
+      const dob = document.getElementById('student-dob').value.trim();
+
+      if (!roll || !dob) {
+        showToast('Please enter both Roll Number and Date of Birth (DDMMYYYY).', 'warning');
+        return;
+      }
+
+      const originalText = submitStudentBtn.innerHTML;
+      submitStudentBtn.disabled = true;
+      submitStudentBtn.innerHTML = `<span class="skeleton-bar" style="width: 80px; height: 16px; margin: 0; background: rgba(255,255,255,0.4)"></span>`;
+
+      const result = await studentLogin(roll, dob);
+
+      submitStudentBtn.disabled = false;
+      submitStudentBtn.innerHTML = originalText;
+
+      if (result.success) {
+        showToast(`Welcome to Student Portal, ${result.user.name}!`, 'success');
+        setTimeout(() => {
+          window.location.href = 'student.html';
+        }, 800);
+      } else {
+        showToast(result.error || 'Invalid Roll Number or Date of Birth.', 'error');
+      }
+    });
+
+    // Handle Forgot Submit
+    const formForgot = document.getElementById('form-forgot');
+    formForgot.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showToast('Simulating recovery flow... reset link sent!', 'success');
+      setTimeout(() => {
+        forgotView.style.display = 'none';
+        tabsWrap.style.display = 'flex';
+        loginView.style.display = 'block';
+      }, 1500);
+    });
+  </script>
+
+</body>
+
+</html>
