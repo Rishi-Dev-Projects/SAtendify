@@ -420,19 +420,30 @@ def process_timetable():
                 
                 # If they overlap
                 if candidate_periods.intersection(s_periods):
+                    cand_is_lab = (slot_type != 'lecture')
+                    exist_is_lab = (s.get('type', 'lecture') != 'lecture')
+
                     # Check 1: Teacher Conflict
                     if s.get('facultyId') == faculty_id:
-                        return jsonify({
-                            "success": False, 
-                            "error": f"Conflict: Assigned professor is already scheduled to teach in this slot (overlapping Period {s_start} to {s_start + s_dur - 1})."
-                        }), 409
+                        # Allow same professor for multi-batch labs in shared location
+                        if cand_is_lab and exist_is_lab and s.get('division') != div:
+                            pass
+                        else:
+                            return jsonify({
+                                "success": False, 
+                                "error": f"Conflict: Assigned professor is already scheduled to teach in this slot (overlapping Period {s_start} to {s_start + s_dur - 1})."
+                            }), 409
                         
                     # Check 2: Room Conflict
                     if s.get('room') == room:
-                        return jsonify({
-                            "success": False, 
-                            "error": f"Conflict: Room {room} is already booked in this slot (overlapping Period {s_start} to {s_start + s_dur - 1})."
-                        }), 409
+                        # Allow same room/location for labs across different batches
+                        if cand_is_lab and exist_is_lab and s.get('division') != div:
+                            pass
+                        else:
+                            return jsonify({
+                                "success": False, 
+                                "error": f"Conflict: Room {room} is already booked in this slot (overlapping Period {s_start} to {s_start + s_dur - 1})."
+                            }), 409
                         
                     # Check 3: Class/Division Conflict
                     if s.get('department') == dept and s.get('semester') == sem:
@@ -441,7 +452,7 @@ def process_timetable():
                         if is_cand_lecture or is_exist_lecture or s.get('division') == div:
                             return jsonify({
                                 "success": False, 
-                                "error": f"Conflict: Selected stream semester is already scheduled for a class/lecture in this slot (overlapping Period {s_start} to {s_start + s_dur - 1})."
+                                "error": f"Conflict: Selected stream division is already scheduled for a class/lecture in this slot (overlapping Period {s_start} to {s_start + s_dur - 1})."
                             }), 409
 
             # Determine target batches for this semester
