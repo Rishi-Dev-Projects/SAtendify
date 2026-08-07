@@ -29,6 +29,7 @@ function renderSidebar(user, activeTab) {
 
   if (user.role === 'admin') {
     linksHTML = `
+      <li class="nav-item ${activeTab === 'profile' ? 'active' : ''}"><a href="profile.html">My Profile</a></li>
       <li class="nav-item ${activeTab === 'overview' ? 'active' : ''}"><a href="admin.html?tab=overview">Dashboard</a></li>
       <li class="nav-item ${activeTab === 'departments' ? 'active' : ''}"><a href="admin.html?tab=departments">Subjects</a></li>
       <li class="nav-item ${activeTab === 'faculty' ? 'active' : ''}"><a href="admin.html?tab=faculty">Faculty</a></li>
@@ -38,6 +39,7 @@ function renderSidebar(user, activeTab) {
     `;
   } else if (user.role === 'hod') {
     linksHTML = `
+      <li class="nav-item ${activeTab === 'profile' ? 'active' : ''}"><a href="profile.html">My Profile</a></li>
       <li class="nav-item ${activeTab === 'overview' ? 'active' : ''}"><a href="hod.html?tab=overview">Dashboard</a></li>
       <li class="nav-item ${activeTab === 'faculty' ? 'active' : ''}"><a href="hod.html?tab=faculty">Faculty Assignments</a></li>
       <li class="nav-item ${activeTab === 'proxies' ? 'active' : ''}"><a href="hod.html?tab=proxies">Proxy Allocations</a></li>
@@ -48,6 +50,7 @@ function renderSidebar(user, activeTab) {
     `;
   } else if (user.role === 'faculty') {
     linksHTML = `
+      <li class="nav-item ${activeTab === 'profile' ? 'active' : ''}"><a href="profile.html">My Profile</a></li>
       <li class="nav-item ${activeTab === 'timetable-today' ? 'active' : ''}"><a href="faculty.html?tab=timetable-today">Today's Classes</a></li>
       <li class="nav-item ${activeTab === 'proxies' ? 'active' : ''}"><a href="faculty.html?tab=proxies">Proxy Allocations</a></li>
       <li class="nav-item ${activeTab === 'students' ? 'active' : ''}"><a href="faculty.html?tab=students">Students</a></li>
@@ -56,6 +59,7 @@ function renderSidebar(user, activeTab) {
     `;
   } else if (user.role === 'student') {
     linksHTML = `
+      <li class="nav-item ${activeTab === 'profile' ? 'active' : ''}"><a href="profile.html">My Profile</a></li>
       <li class="nav-item ${activeTab === 'overview' || activeTab === 'my-attendance' ? 'active' : ''}"><a href="student.html?tab=overview">Overview Stats</a></li>
       <li class="nav-item ${activeTab === 'subjects' ? 'active' : ''}"><a href="student.html?tab=subjects">Subject Progress</a></li>
       <li class="nav-item ${activeTab === 'attendance-log' ? 'active' : ''}"><a href="student.html?tab=attendance-log">Attendance Logs</a></li>
@@ -132,14 +136,14 @@ function renderHeader(user, pageTitle) {
           <h2 style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0;" title="${pageTitle}">${pageTitle}</h2>
         </div>
       </div>
-      <div class="user-profile-badge" style="flex-shrink: 0;">
+      <a href="profile.html" class="user-profile-badge clickable-profile-badge" title="View Full Profile" style="flex-shrink: 0; text-decoration: none; cursor: pointer; transition: all 0.2s ease;">
         ${deptBadge}
         <div class="profile-info">
-          <div class="profile-name">${user.name}</div>
-          <div class="profile-role">${user.role}</div>
+          <div class="profile-name" style="font-weight: 700;">${user.name}</div>
+          <div class="profile-role" style="text-transform: capitalize; color: var(--color-accent); font-weight: 600;">${user.role} &bull; Profile &rarr;</div>
         </div>
-        <div class="avatar">${initials}</div>
-      </div>
+        <div class="avatar" style="box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);">${initials}</div>
+      </a>
     </header>
   `;
 }

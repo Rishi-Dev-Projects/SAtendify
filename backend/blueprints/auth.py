@@ -9,22 +9,51 @@ auth_bp = Blueprint('auth', __name__)
 @require_auth()
 def get_profile():
     """
-    Returns the currently logged in user's profile information.
-    Resolves role, department, semester, and other details from Firestore.
+    Returns the currently logged in user's enriched profile information.
+    Resolves role, department, semester, assigned subjects, and stats from Firestore.
     """
-    # g.current_user is populated by require_auth decorator
+    user = g.current_user
+    uid = user.get('uid')
+    role = user.get('role')
+    dept = user.get('department')
+    
     user_data = {
-        "id": g.current_user.get('uid'),
-        "email": g.current_user.get('email'),
-        "role": g.current_user.get('role'),
-        "name": g.current_user.get('name'),
-        "department": g.current_user.get('department'),
-        "semester": g.current_user.get('semester'),
-        "division": g.current_user.get('division'),
-        "rollNumber": g.current_user.get('rollNumber'),
-        "dob": g.current_user.get('dob'),
-        "subjects": g.current_user.get('assignedSubjects', [])
+        "id": uid,
+        "email": user.get('email', 'N/A'),
+        "role": role,
+        "name": user.get('name', 'User'),
+        "department": dept,
+        "status": user.get('status', 'active'),
+        "createdAt": user.get('createdAt')
     }
+
+    if role == 'student':
+        user_data.update({
+            "semester": user.get('semester'),
+            "division": user.get('division'),
+            "rollNumber": user.get('rollNumber'),
+            "dob": user.get('dob')
+        })
+    elif role in ['faculty', 'hod']:
+        assigned_sub_ids = user.get('assignedSubjects', [])
+        sub_list = []
+        if assigned_sub_ids:
+            for s_id in assigned_sub_ids:
+                s_snap = db.collection('subjects').document(s_id).get()
+                if s_snap.exists:
+                    s_dict = s_snap.to_dict()
+                    sub_list.append({"id": s_id, "name": s_dict.get('name'), "code": s_dict.get('code')})
+        user_data["subjects"] = sub_list
+
+        if role == 'hod' and dept:
+            try:
+                fac_count = len(db.collection('users').where('role', '==', 'faculty').where('department', '==', dept).get())
+                stu_count = len(db.collection('users').where('role', '==', 'student').where('department', '==', dept).get())
+                user_data["deptFacultyCount"] = fac_count
+                user_data["deptStudentCount"] = stu_count
+            except Exception:
+                pass
+
     return jsonify({"success": True, "data": user_data}), 200
 
 @auth_bp.route('/login', methods=['POST'])

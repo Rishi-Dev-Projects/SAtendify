@@ -303,6 +303,21 @@ button, input, select, textarea {
   flex-shrink: 0;
 }
 
+.clickable-profile-badge {
+  padding: 6px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease-in-out;
+}
+
+.clickable-profile-badge:hover {
+  transform: translateY(-2px);
+  background: #ffffff;
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.15);
+}
+
 .hamburger-menu {
   display: none;
   background: none;
