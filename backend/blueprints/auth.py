@@ -56,6 +56,38 @@ def get_profile():
 
     return jsonify({"success": True, "data": user_data}), 200
 
+@auth_bp.route('/me', methods=['PUT'])
+@require_auth(['admin', 'hod', 'faculty'])
+def update_my_profile():
+    """
+    Updates currently logged in staff (HOD / Faculty) or Admin profile details.
+    Students are strictly forbidden from modifying official records.
+    """
+    uid = g.current_user.get('uid')
+    data = request.get_json() or {}
+    
+    name = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+
+    if not name:
+        return jsonify({"success": False, "error": "Full Name is required."}), 400
+
+    try:
+        user_ref = db.collection('users').document(uid)
+        update_data = {"name": name}
+        if email:
+            update_data["email"] = email
+
+        user_ref.update(update_data)
+
+        # Clear in-memory auth cache so profile updates reflect immediately
+        from decorators import USER_CACHE
+        USER_CACHE.clear()
+
+        return jsonify({"success": True, "message": "Profile details updated successfully!"}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """

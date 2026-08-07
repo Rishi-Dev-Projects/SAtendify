@@ -1,6 +1,6 @@
 import { guardRoute } from './auth.js';
 import { initializeChrome } from './main.js';
-import { apiFetch } from './api.js';
+import { apiFetch, showToast } from './api.js';
 
 // Route guard for all authenticated roles
 const user = guardRoute(['admin', 'hod', 'faculty', 'student']);
@@ -23,18 +23,19 @@ function formatDOB(dobStr) {
 
 // Inline SVG Icons Map (Zero Emojis)
 const SVG_ICONS = {
-  user: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
-  mail: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>`,
-  shield: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`,
-  dept: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"></rect><path d="M9 22v-4h6v4"></path><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line></svg>`,
-  roll: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="7" y1="8" x2="17" y2="8"></line><line x1="7" y1="12" x2="13" y2="12"></line><line x1="7" y1="16" x2="11" y2="16"></line></svg>`,
-  calendar: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`,
-  graduation: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>`,
-  batch: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>`,
-  book: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`,
-  users: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-3-3.87"></path><path d="M9 21v-2a4 4 0 0 1 3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>`,
-  status: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
+  user: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
+  mail: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>`,
+  shield: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`,
+  dept: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"></rect><path d="M9 22v-4h6v4"></path><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line></svg>`,
+  roll: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="7" y1="8" x2="17" y2="8"></line><line x1="7" y1="12" x2="13" y2="12"></line><line x1="7" y1="16" x2="11" y2="16"></line></svg>`,
+  calendar: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`,
+  graduation: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>`,
+  batch: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>`,
+  book: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`,
+  users: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-3-3.87"></path><path d="M9 21v-2a4 4 0 0 1 3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>`
 };
+
+let currentProfile = null;
 
 async function initProfilePage() {
   initializeChrome('profile', 'User Profile');
@@ -52,76 +53,159 @@ async function initProfilePage() {
     });
   }
 
-  // Populate hero banner initial data from session
-  const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U';
-  document.getElementById('hero-avatar').textContent = initials;
-  document.getElementById('hero-name').textContent = user.name || 'User Profile';
-  document.getElementById('hero-role-badge').textContent = (user.role || 'USER').toUpperCase();
-  document.getElementById('hero-subtext').textContent = user.department ? `${user.department} Department Stream` : 'SAtendify Portal Member';
-
   // Fetch enriched profile data from API
   const res = await apiFetch('/auth/me');
-  const profile = (res && res.success) ? res.data : user;
+  currentProfile = (res && res.success) ? res.data : user;
 
-  renderProfileGrid(profile);
+  renderProfileData(currentProfile);
+  setupEditModal(currentProfile);
 }
 
-function renderProfileGrid(profile) {
-  const grid = document.getElementById('profile-field-grid');
-  if (!grid) return;
+function renderProfileData(profile) {
+  // Sidebar info
+  const initials = profile.name ? profile.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U';
+  document.getElementById('sidebar-avatar').textContent = initials;
+  document.getElementById('sidebar-name').textContent = profile.name || 'User Profile';
+  document.getElementById('sidebar-role-badge').textContent = (profile.role || 'USER').toUpperCase();
+  document.getElementById('sidebar-dept-badge').textContent = profile.department ? `${profile.department} Stream` : 'General';
 
+  // Identity Panel
+  document.getElementById('val-name').textContent = profile.name || 'N/A';
+  document.getElementById('val-email').textContent = profile.email || 'N/A';
+  document.getElementById('val-role').textContent = (profile.role || 'N/A').toUpperCase();
+  document.getElementById('val-dept').textContent = profile.department ? `${profile.department} Department` : 'General / All';
+
+  // Role Specifications Panel
+  const rolePanelTitle = document.getElementById('role-panel-title');
+  const roleGrid = document.getElementById('role-field-grid');
   const role = profile.role;
 
-  // Base Common Fields
-  let fields = [
-    { label: 'Full Name', value: profile.name || 'N/A', icon: SVG_ICONS.user },
-    { label: 'Email Address', value: profile.email || 'N/A', icon: SVG_ICONS.mail },
-    { label: 'System Role', value: (profile.role || 'N/A').toUpperCase(), icon: SVG_ICONS.shield },
-    { label: 'Department Stream', value: profile.department ? `${profile.department} Department` : 'General / All Streams', icon: SVG_ICONS.dept },
-    { label: 'Account Status', value: '<span class="badge badge-success">ACTIVE</span>', icon: SVG_ICONS.status }
-  ];
+  let fields = [];
 
-  // Role-Tailored Custom Fields
   if (role === 'student') {
-    fields.push(
+    rolePanelTitle.textContent = 'Student Enrollment Record';
+    fields = [
       { label: 'Roll Number', value: `<span style="color:var(--color-accent); font-weight:800;">${profile.rollNumber || 'N/A'}</span>`, icon: SVG_ICONS.roll },
       { label: 'Date of Birth', value: formatDOB(profile.dob), icon: SVG_ICONS.calendar },
       { label: 'Academic Semester', value: `Semester ${profile.semester || 'N/A'}`, icon: SVG_ICONS.graduation },
-      { label: 'Division / Batch', value: `Batch ${profile.division || 'N/A'}`, icon: SVG_ICONS.batch }
-    );
+      { label: 'Class Division / Batch', value: `Batch ${profile.division || 'N/A'}`, icon: SVG_ICONS.batch }
+    ];
   } else if (role === 'faculty') {
+    rolePanelTitle.textContent = 'Faculty Academic Portfolio';
     const subs = profile.subjects || [];
     const subHTML = subs.length > 0
       ? subs.map(s => `<span class="badge badge-primary" style="margin: 2px;">${s.code || ''} ${s.name || s}</span>`).join(' ')
       : '<span style="font-size:0.85rem; color:var(--text-muted);">No courses assigned</span>';
 
-    fields.push(
-      { label: 'Assigned Courses Count', value: `${subs.length} Active Courses`, icon: SVG_ICONS.book },
-      { label: 'Assigned Courses List', value: `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">${subHTML}</div>`, icon: SVG_ICONS.book }
-    );
+    fields = [
+      { label: 'Assigned Department', value: `${profile.department || 'N/A'} Department`, icon: SVG_ICONS.dept },
+      { label: 'Active Courses Count', value: `${subs.length} Courses Assigned`, icon: SVG_ICONS.book },
+      { label: 'Assigned Courses', value: `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">${subHTML}</div>`, icon: SVG_ICONS.book }
+    ];
   } else if (role === 'hod') {
-    fields.push(
-      { label: 'Department Designation', value: `Head of ${profile.department || 'N/A'} Department`, icon: SVG_ICONS.dept },
-      { label: 'Faculty Members', value: `${profile.deptFacultyCount || 0} Faculty Staff`, icon: SVG_ICONS.users },
-      { label: 'Enrolled Students', value: `${profile.deptStudentCount || 0} Active Students`, icon: SVG_ICONS.graduation }
-    );
+    rolePanelTitle.textContent = 'Department Head Specifications';
+    fields = [
+      { label: 'HOD Designation', value: `Head of ${profile.department || 'N/A'} Department`, icon: SVG_ICONS.dept },
+      { label: 'Department Faculty Staff', value: `${profile.deptFacultyCount || 0} Faculty Members`, icon: SVG_ICONS.users },
+      { label: 'Enrolled Department Students', value: `${profile.deptStudentCount || 0} Active Students`, icon: SVG_ICONS.graduation }
+    ];
   } else if (role === 'admin') {
-    fields.push(
-      { label: 'Administrator Scope', value: 'Global Institutional Superuser', icon: SVG_ICONS.shield },
-      { label: 'System Privileges', value: 'Full Access to Users, Timetables & Logs', icon: SVG_ICONS.status }
-    );
+    rolePanelTitle.textContent = 'System Administration Rights';
+    fields = [
+      { label: 'Administration Scope', value: 'Global Institutional Administrator', icon: SVG_ICONS.shield },
+      { label: 'Privilege Level', value: 'Superuser Access (Users, Timetables, Logs)', icon: SVG_ICONS.shield }
+    ];
   }
 
-  // Render Grid
-  grid.innerHTML = fields.map(f => `
-    <div class="profile-field-item">
-      <div class="field-icon-box">
+  roleGrid.innerHTML = fields.map(f => `
+    <div class="data-field-box">
+      <div class="field-icon">
         ${f.icon}
       </div>
       <div>
-        <div class="field-label">${f.label}</div>
-        <div class="field-value">${f.value}</div>
+        <div class="field-title">${f.label}</div>
+        <div class="field-text">${f.value}</div>
       </div>
     </div>
   `).join('');
+}
+
+function setupEditModal(profile) {
+  const editBtn = document.getElementById('btn-open-edit-modal');
+  const studentNotice = document.getElementById('student-readonly-notice');
+  const modal = document.getElementById('edit-profile-modal');
+  const closeBtn = document.getElementById('modal-close-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+  const form = document.getElementById('edit-profile-form');
+  const nameInput = document.getElementById('edit-name-input');
+  const emailInput = document.getElementById('edit-email-input');
+
+  const isStaffOrAdmin = ['admin', 'hod', 'faculty'].includes(profile.role);
+
+  if (isStaffOrAdmin) {
+    if (editBtn) editBtn.style.display = 'flex';
+    if (studentNotice) studentNotice.style.display = 'none';
+  } else {
+    if (editBtn) editBtn.style.display = 'none';
+    if (studentNotice) studentNotice.style.display = 'block';
+  }
+
+  if (!isStaffOrAdmin || !modal) return;
+
+  const openModal = () => {
+    nameInput.value = profile.name || '';
+    emailInput.value = profile.email || '';
+    modal.style.display = 'flex';
+  };
+
+  const closeModal = () => {
+    modal.style.display = 'none';
+  };
+
+  if (editBtn) editBtn.addEventListener('click', openModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newName = nameInput.value.trim();
+    const newEmail = emailInput.value.trim();
+
+    if (!newName) {
+      showToast('Full Name is required.', 'error');
+      return;
+    }
+
+    const saveBtn = document.getElementById('btn-save-profile');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    const res = await apiFetch('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify({ name: newName, email: newEmail })
+    });
+
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Changes';
+
+    if (res && res.success) {
+      showToast('Profile updated successfully!', 'success');
+      profile.name = newName;
+      profile.email = newEmail;
+
+      // Update session in localStorage
+      const sessionStr = localStorage.getItem('sat_session');
+      if (sessionStr) {
+        try {
+          const sess = JSON.parse(sessionStr);
+          sess.user.name = newName;
+          sess.user.email = newEmail;
+          localStorage.setItem('sat_session', JSON.stringify(sess));
+        } catch (err) {}
+      }
+
+      renderProfileData(profile);
+      closeModal();
+    }
+  });
 }
