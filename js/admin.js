@@ -1323,7 +1323,7 @@ async function renderTimetableTab() {
           const sub = subjects.find(s => s.id === cellVal.subjectId);
           const fac = users.find(u => u.id === cellVal.facultyId);
           const isStart = p.num === cellVal.period;
-          const typeLabel = cellVal.type === 'lab' ? '🔬 Lab' : cellVal.type === 'tutorial' ? '📖 Tut' : '';
+          const typeLabel = cellVal.type === 'lab' ? 'Lab' : cellVal.type === 'tutorial' ? 'Tutorial' : '';
 
           if (isStart) {
             gridHTML += `
@@ -1331,9 +1331,9 @@ async function renderTimetableTab() {
                 <div>
                   <button class="cell-action-delete" data-id="${cellVal.id}">&times;</button>
                   <div class="cell-subject">${sub ? sub.name : 'Unknown'} ${typeLabel ? `<span style="font-size:0.7rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 4px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''}</div>
-                  <div class="cell-faculty">👨‍🏫 ${fac ? fac.name.replace('Prof. ', '').replace('Dr. ', '') : 'Faculty'}</div>
+                  <div class="cell-faculty">${fac ? fac.name.replace('Prof. ', '').replace('Dr. ', '') : 'Faculty'}</div>
                 </div>
-                <div class="cell-room">🚪 ${cellVal.room}</div>
+                <div class="cell-room">Room ${cellVal.room}</div>
               </div>
             `;
           } else {
@@ -1343,7 +1343,7 @@ async function renderTimetableTab() {
                 <div style="font-size:0.75rem; color:var(--text-secondary); font-style:italic;">
                   (Continuation of ${sub ? sub.code : 'lecture'})
                 </div>
-                <div class="cell-room">🚪 ${cellVal.room}</div>
+                <div class="cell-room">Room ${cellVal.room}</div>
               </div>
             `;
           }

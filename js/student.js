@@ -653,16 +653,16 @@ async function renderStudentTimetableGrid() {
 
         if (cell) {
           const isStart = p.num === cell.period;
-          const typeLabel = cell.type === 'lab' ? '🔬 Lab' : cell.type === 'tutorial' ? '📖 Tut' : '';
+          const typeLabel = cell.type === 'lab' ? 'Lab' : cell.type === 'tutorial' ? 'Tutorial' : '';
 
           if (isStart) {
             gridHTML += `
               <div class="timetable-cell" style="background-color: var(--color-accent-subtle); ${cell.type && cell.type !== 'lecture' ? 'border-left: 3px solid var(--color-success);' : ''}">
                 <div>
                   <div class="cell-subject" style="color:var(--color-accent);">${cell.subject ? cell.subject.name : 'Class'} ${typeLabel ? `<span style="font-size:0.65rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 4px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''}</div>
-                  <div class="cell-faculty">👨‍🏫 ${cell.facultyName.replace('Prof. ', '').replace('Dr. ', '')}</div>
+                  <div class="cell-faculty">${cell.facultyName.replace('Prof. ', '').replace('Dr. ', '')}</div>
                 </div>
-                <div class="cell-room">🚪 Rm ${cell.room}</div>
+                <div class="cell-room">Room ${cell.room}</div>
               </div>
             `;
           } else {
@@ -671,7 +671,7 @@ async function renderStudentTimetableGrid() {
                 <div style="font-size:0.75rem; color:var(--text-secondary); font-style:italic;">
                   (Continuation of ${cell.subject ? cell.subject.code : 'lecture'})
                 </div>
-                <div class="cell-room">🚪 Rm ${cell.room}</div>
+                <div class="cell-room">Room ${cell.room}</div>
               </div>
             `;
           }

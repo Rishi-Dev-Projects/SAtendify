@@ -71,13 +71,17 @@ async function initProfilePage() {
 
 function renderRoleCard(profile) {
   const cardTitle = document.getElementById('role-card-title');
+  const cardIcon = document.getElementById('role-card-icon');
   const cardBody = document.getElementById('role-card-body');
   if (!cardTitle || !cardBody) return;
 
   const role = profile.role;
 
   if (role === 'student') {
-    cardTitle.textContent = '🎓 Student Academic Profile';
+    if (cardIcon) {
+      cardIcon.innerHTML = `<svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>`;
+    }
+    cardTitle.textContent = 'Student Academic Profile';
     cardBody.innerHTML = `
       <div class="profile-info-row">
         <span class="profile-info-label">Roll Number</span>
@@ -101,7 +105,10 @@ function renderRoleCard(profile) {
       </div>
     `;
   } else if (role === 'faculty') {
-    cardTitle.textContent = '👨‍🏫 Faculty Academic Portfolio';
+    if (cardIcon) {
+      cardIcon.innerHTML = `<svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
+    }
+    cardTitle.textContent = 'Faculty Academic Portfolio';
     const subs = profile.subjects || [];
     const subBadges = subs.length > 0
       ? subs.map(s => `<span class="badge badge-primary" style="margin: 2px;">${s.code || ''} ${s.name || s}</span>`).join(' ')
@@ -124,7 +131,10 @@ function renderRoleCard(profile) {
       </div>
     `;
   } else if (role === 'hod') {
-    cardTitle.textContent = '👑 HOD Department Management';
+    if (cardIcon) {
+      cardIcon.innerHTML = `<svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
+    }
+    cardTitle.textContent = 'HOD Department Management';
     cardBody.innerHTML = `
       <div class="profile-info-row">
         <span class="profile-info-label">Designation</span>
@@ -144,11 +154,14 @@ function renderRoleCard(profile) {
       </div>
     `;
   } else if (role === 'admin') {
-    cardTitle.textContent = '⚡ System Administration Scope';
+    if (cardIcon) {
+      cardIcon.innerHTML = `<svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01"></path></svg>`;
+    }
+    cardTitle.textContent = 'System Administration Scope';
     cardBody.innerHTML = `
       <div class="profile-info-row">
         <span class="profile-info-label">Administrative Scope</span>
-        <span class="profile-info-value">Global Institution Administrator</span>
+        <span class="profile-info-value">Global Institutional Administrator</span>
       </div>
       <div class="profile-info-row">
         <span class="profile-info-label">Privilege Level</span>
@@ -162,6 +175,9 @@ function renderRoleCard(profile) {
         <span class="profile-info-label">Security Protocol</span>
         <span class="profile-info-value"><span class="badge badge-primary">Encrypted Bearer Session</span></span>
       </div>
+    `;
+  }
+}iv>
     `;
   }
 }
