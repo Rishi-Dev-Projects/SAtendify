@@ -721,8 +721,8 @@ async function renderTimetableTab() {
 
     document.getElementById('timetable-title-label').textContent = `${user.department} Department — Semester ${sem} (Batch ${div}) Schedule`;
 
-    // Filter scoped to HOD's department and selected details
-    const gridData = timetable.filter(c => c.department === user.department && c.semester === sem && c.division === div);
+    // Filter scoped to HOD's department and selected details (lectures apply to all batches of the semester)
+    const gridData = timetable.filter(c => c.department === user.department && c.semester === sem && (c.division === div || c.type === 'lecture' || !c.type));
 
     const grid = document.getElementById('timetable-cells-grid');
     let gridHTML = `<div class="timetable-header-cell">Period</div>`;
@@ -950,7 +950,10 @@ async function renderTimetableTab() {
 
         if (postRes.success) {
           showToast('Schedule slot booked successfully without conflict!', 'success');
-          timetable.push(postRes.data);
+          const refreshRes = await apiFetch('/admin/timetable', { skipCache: true });
+          if (refreshRes.success) {
+            timetable = refreshRes.data;
+          }
           drawGrid();
           return true;
         }
@@ -983,9 +986,12 @@ async function renderTimetableTab() {
         const delRes = await apiFetch(`/admin/timetable/${cellId}`, { method: 'DELETE' });
         if (delRes.success) {
           showToast('Lecture slot unscheduled', 'success');
-          const tIndex = timetable.findIndex(c => c.id === cellId);
-          if (tIndex > -1) {
-            timetable.splice(tIndex, 1);
+          const refreshRes = await apiFetch('/admin/timetable', { skipCache: true });
+          if (refreshRes.success) {
+            timetable = refreshRes.data;
+          } else {
+            const tIndex = timetable.findIndex(c => c.id === cellId);
+            if (tIndex > -1) timetable.splice(tIndex, 1);
           }
           drawGrid();
         }

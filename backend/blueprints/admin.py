@@ -410,6 +410,7 @@ def process_timetable():
             day_slots = db.collection('timetables').where('day', '==', day).stream()
             day_slots_list = [dict(s.to_dict(), id=s.id) for s in day_slots]
             
+            # Overlap check candidate periods
             candidate_periods = set(range(period, period + duration))
             
             for s in day_slots_list:
@@ -434,30 +435,52 @@ def process_timetable():
                         }), 409
                         
                     # Check 3: Class/Division Conflict
-                    if s.get('department') == dept and s.get('semester') == sem and s.get('division') == div:
-                        return jsonify({
-                            "success": False, 
-                            "error": f"Conflict: Selected stream division is already scheduled for class in this slot (overlapping Period {s_start} to {s_start + s_dur - 1})."
-                        }), 409
+                    if s.get('department') == dept and s.get('semester') == sem:
+                        is_cand_lecture = (slot_type == 'lecture')
+                        is_exist_lecture = (s.get('type', 'lecture') == 'lecture')
+                        if is_cand_lecture or is_exist_lecture or s.get('division') == div:
+                            return jsonify({
+                                "success": False, 
+                                "error": f"Conflict: Selected stream semester is already scheduled for a class/lecture in this slot (overlapping Period {s_start} to {s_start + s_dur - 1})."
+                            }), 409
 
-            # Compile ID matching and save timetable entry
-            new_id = f"tt-slot-{dept.lower()}-{sem}-{div.lower()}-{day.lower()[:3]}-{period}"
-            doc_ref = db.collection('timetables').document(new_id)
-            doc_ref.set({
-                "department": dept,
-                "semester": sem,
-                "division": div,
-                "day": day,
-                "period": period,
-                "type": slot_type,
-                "duration": duration,
-                "subjectId": subject_id,
-                "facultyId": faculty_id,
-                "room": room
-            })
-            
-            saved_data = dict(data, id=new_id, type=slot_type, duration=duration)
-            return jsonify({"success": True, "data": saved_data}), 201
+            # Determine target batches for this semester
+            target_batches = [div]
+            if slot_type == 'lecture':
+                # Fetch semester batch configuration if present
+                cfg_snap = db.collection('configs').document('semester_batches').get()
+                cfg = cfg_snap.to_dict() if cfg_snap.exists else {}
+                max_batches = int(cfg.get(str(sem), 2))
+                
+                enrollment_year = 2026 - (sem - 1) // 2
+                year_suffix = str(enrollment_year % 100).zfill(2)
+                computed_batches = [f"{year_suffix}{i}" for i in range(1, max_batches + 1)]
+                for b in computed_batches:
+                    if b not in target_batches:
+                        target_batches.append(b)
+
+            saved_slots = []
+            for b in target_batches:
+                new_id = f"tt-slot-{dept.lower()}-{sem}-{b.lower()}-{day.lower()[:3]}-{period}"
+                doc_ref = db.collection('timetables').document(new_id)
+                slot_payload = {
+                    "department": dept,
+                    "semester": sem,
+                    "division": b,
+                    "day": day,
+                    "period": period,
+                    "type": slot_type,
+                    "duration": duration,
+                    "subjectId": subject_id,
+                    "facultyId": faculty_id,
+                    "room": room
+                }
+                doc_ref.set(slot_payload)
+                saved_slots.append(dict(slot_payload, id=new_id))
+
+            primary_id = f"tt-slot-{dept.lower()}-{sem}-{div.lower()}-{day.lower()[:3]}-{period}"
+            saved_data = dict(data, id=primary_id, type=slot_type, duration=duration)
+            return jsonify({"success": True, "data": saved_data, "all_synced": saved_slots}), 201
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
 
@@ -474,8 +497,26 @@ def delete_timetable_slot(id):
         # Scope filters details
         if g.current_user.get('role') == 'hod' and g.current_user.get('department') != slot_data.get('department'):
             return jsonify({"success": False, "error": "Forbidden: cannot delete slots from outside department."}), 403
-            
-        doc_ref.delete()
+
+        slot_type = slot_data.get('type', 'lecture')
+        dept_val = slot_data.get('department')
+        sem_val = slot_data.get('semester')
+        day_val = slot_data.get('day')
+        period_val = slot_data.get('period')
+
+        if slot_type == 'lecture':
+            # Delete corresponding lecture slot across all batches of this semester
+            all_slots = db.collection('timetables')\
+                          .where('department', '==', dept_val)\
+                          .where('semester', '==', sem_val)\
+                          .where('day', '==', day_val)\
+                          .where('period', '==', period_val).stream()
+            for s_doc in all_slots:
+                if s_doc.to_dict().get('type', 'lecture') == 'lecture':
+                    s_doc.reference.delete()
+        else:
+            doc_ref.delete()
+
         return jsonify({"success": True, "message": "Timetable lecture slot removed"}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

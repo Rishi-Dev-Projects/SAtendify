@@ -1292,8 +1292,8 @@ async function renderTimetableTab() {
 
     document.getElementById('timetable-title-label').textContent = `${dept} Department — Semester ${sem} (Batch ${div}) Academic Schedule`;
 
-    // Filter elements in timetable matching selectors
-    const gridData = timetable.filter(c => c.department === dept && c.semester === sem && c.division === div);
+    // Filter elements in timetable matching selectors (lectures apply to all batches of the semester)
+    const gridData = timetable.filter(c => c.department === dept && c.semester === sem && (c.division === div || c.type === 'lecture' || !c.type));
 
     const gridElement = document.getElementById('timetable-cells-grid');
 
@@ -1540,8 +1540,11 @@ async function renderTimetableTab() {
         if (postRes.success) {
           showToast('Schedule slot booked successfully without conflict!', 'success');
 
-          // Add to local schedule array dynamically so we don't need reload
-          timetable.push(postRes.data);
+          // Re-fetch latest timetable so all synced batch lectures update in real time
+          const refreshRes = await apiFetch('/admin/timetable', { skipCache: true });
+          if (refreshRes.success) {
+            timetable = refreshRes.data;
+          }
           drawTimetableGrid();
           return true;
         }
@@ -1574,9 +1577,12 @@ async function renderTimetableTab() {
         const delRes = await apiFetch(`/admin/timetable/${cellId}`, { method: 'DELETE' });
         if (delRes.success) {
           showToast('Lecture slot unscheduled', 'success');
-          const tIndex = timetable.findIndex(c => c.id === cellId);
-          if (tIndex > -1) {
-            timetable.splice(tIndex, 1);
+          const refreshRes = await apiFetch('/admin/timetable', { skipCache: true });
+          if (refreshRes.success) {
+            timetable = refreshRes.data;
+          } else {
+            const tIndex = timetable.findIndex(c => c.id === cellId);
+            if (tIndex > -1) timetable.splice(tIndex, 1);
           }
           drawTimetableGrid();
         }

@@ -20,11 +20,10 @@ def get_student_timetable():
         return jsonify({"success": False, "error": "Student profile is not assigned to a department, semester or division."}), 400
         
     try:
-        # Query timetable slots for this specific semester division
+        # Query timetable slots for this specific department and semester
         slots_snaps = db.collection('timetables')\
                         .where('department', '==', dept)\
-                        .where('semester', '==', int(sem))\
-                        .where('division', '==', div).get()
+                        .where('semester', '==', int(sem)).get()
         # Batch pre-fetch subjects and users maps
         subs_dict = {doc.id: doc.to_dict() for doc in db.collection('subjects').stream()}
         users_dict = {doc.id: doc.to_dict().get('name', 'Professor') for doc in db.collection('users').stream()}
@@ -32,6 +31,13 @@ def get_student_timetable():
         results = []
         for doc in slots_snaps:
             slot = doc.to_dict()
+            s_type = slot.get('type', 'lecture')
+            s_div = slot.get('division')
+
+            # Filter: include lectures for all batches of the semester, but restrict labs/tutorials to matching division
+            if s_type != 'lecture' and s_div != div:
+                continue
+
             sub_id = slot.get('subjectId')
             faculty_id = slot.get('facultyId')
             
