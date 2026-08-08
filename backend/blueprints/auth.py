@@ -58,11 +58,10 @@ def get_profile():
     return jsonify({"success": True, "data": user_data}), 200
 
 @auth_bp.route('/me', methods=['PUT'])
-@require_auth(['admin', 'hod', 'faculty'])
+@require_auth(['admin', 'hod', 'faculty', 'student'])
 def update_my_profile():
     """
-    Updates currently logged in staff (HOD / Faculty) or Admin profile details.
-    Students are strictly forbidden from modifying official records.
+    Updates profile details (Name, Email, Mobile) for any authenticated user including Students.
     """
     uid = g.current_user.get('uid')
     data = request.get_json() or {}

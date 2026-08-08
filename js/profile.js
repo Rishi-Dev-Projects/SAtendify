@@ -135,7 +135,6 @@ function renderProfileData(profile) {
 
 function setupEditModal(profile) {
   const editBtn = document.getElementById('btn-open-edit-modal');
-  const studentNotice = document.getElementById('student-readonly-notice');
   const modal = document.getElementById('edit-profile-modal');
   const closeBtn = document.getElementById('modal-close-btn');
   const cancelBtn = document.getElementById('modal-cancel-btn');
@@ -144,18 +143,8 @@ function setupEditModal(profile) {
   const emailInput = document.getElementById('edit-email-input');
   const mobileInput = document.getElementById('edit-mobile-input');
 
-  const roleClean = (profile.role || '').toLowerCase();
-  const isStaffOrAdmin = ['admin', 'hod', 'faculty'].includes(roleClean);
-
-  if (isStaffOrAdmin) {
-    if (editBtn) editBtn.style.display = 'flex';
-    if (studentNotice) studentNotice.style.display = 'none';
-  } else {
-    if (editBtn) editBtn.style.display = 'none';
-    if (studentNotice) studentNotice.style.display = 'block';
-  }
-
-  if (!isStaffOrAdmin || !modal) return;
+  if (editBtn) editBtn.style.display = 'flex';
+  if (!modal) return;
 
   const openModal = (e) => {
     if (e) e.preventDefault();
