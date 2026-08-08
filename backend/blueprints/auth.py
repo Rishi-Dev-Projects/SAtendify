@@ -20,6 +20,7 @@ def get_profile():
     user_data = {
         "id": uid,
         "email": user.get('email', 'N/A'),
+        "mobile": user.get('mobile', 'N/A'),
         "role": role,
         "name": user.get('name', 'User'),
         "department": dept,
@@ -68,6 +69,7 @@ def update_my_profile():
     
     name = (data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
+    mobile = (data.get('mobile') or '').strip()
 
     if not name:
         return jsonify({"success": False, "error": "Full Name is required."}), 400
@@ -77,6 +79,8 @@ def update_my_profile():
         update_data = {"name": name}
         if email:
             update_data["email"] = email
+        if mobile:
+            update_data["mobile"] = mobile
 
         user_ref.update(update_data)
 

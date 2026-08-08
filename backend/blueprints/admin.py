@@ -205,6 +205,7 @@ def create_user():
                 "division": data.get('division', 'A'),
                 "rollNumber": roll_no,
                 "dob": dob,
+                "mobile": data.get('mobile') or data.get('phone') or '',
                 "status": "active",
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
@@ -231,7 +232,8 @@ def create_user():
                 "name": name,
                 "role": role,
                 "department": dept,
-                "phone": data.get('phone', ''),
+                "mobile": data.get('mobile') or data.get('phone') or '',
+                "phone": data.get('mobile') or data.get('phone') or '',
                 "status": "active",
                 "assignedSubjects": data.get('assignedSubjects', []),
                 "createdAt": firestore.SERVER_TIMESTAMP
@@ -284,8 +286,12 @@ def handle_user_item(id):
                 update_payload['role'] = data['role']
             if 'department' in data and current_role == 'admin':
                 update_payload['department'] = data['department']
+            if 'mobile' in data:
+                update_payload['mobile'] = data['mobile']
+                update_payload['phone'] = data['mobile']
             if 'phone' in data:
                 update_payload['phone'] = data['phone']
+                update_payload['mobile'] = data['phone']
             if 'status' in data:
                 update_payload['status'] = data['status']
                 

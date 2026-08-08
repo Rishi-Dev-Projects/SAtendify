@@ -25,6 +25,7 @@ function formatDOB(dobStr) {
 const SVG_ICONS = {
   user: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
   mail: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>`,
+  phone: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>`,
   shield: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`,
   dept: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"></rect><path d="M9 22v-4h6v4"></path><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line></svg>`,
   roll: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="7" y1="8" x2="17" y2="8"></line><line x1="7" y1="12" x2="13" y2="12"></line><line x1="7" y1="16" x2="11" y2="16"></line></svg>`,
@@ -80,16 +81,18 @@ function renderProfileData(profile) {
   const roleGrid = document.getElementById('role-field-grid');
   const role = profile.role;
 
-  let fields = [];
+  let fields = [
+    { label: 'Mobile Number', value: profile.mobile || profile.phone || 'N/A', icon: SVG_ICONS.phone }
+  ];
 
   if (role === 'student') {
     rolePanelTitle.textContent = 'Student Enrollment Record';
-    fields = [
+    fields.push(
       { label: 'Roll Number', value: `<span style="color:var(--color-accent); font-weight:800;">${profile.rollNumber || 'N/A'}</span>`, icon: SVG_ICONS.roll },
       { label: 'Date of Birth', value: formatDOB(profile.dob), icon: SVG_ICONS.calendar },
       { label: 'Academic Semester', value: `Semester ${profile.semester || 'N/A'}`, icon: SVG_ICONS.graduation },
       { label: 'Class Division / Batch', value: `Batch ${profile.division || 'N/A'}`, icon: SVG_ICONS.batch }
-    ];
+    );
   } else if (role === 'faculty') {
     rolePanelTitle.textContent = 'Faculty Academic Portfolio';
     const subs = profile.subjects || [];
@@ -97,24 +100,24 @@ function renderProfileData(profile) {
       ? subs.map(s => `<span class="badge badge-primary" style="margin: 2px;">${s.code || ''} ${s.name || s}</span>`).join(' ')
       : '<span style="font-size:0.85rem; color:var(--text-muted);">No courses assigned</span>';
 
-    fields = [
+    fields.push(
       { label: 'Assigned Department', value: `${profile.department || 'N/A'} Department`, icon: SVG_ICONS.dept },
       { label: 'Active Courses Count', value: `${subs.length} Courses Assigned`, icon: SVG_ICONS.book },
       { label: 'Assigned Courses', value: `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">${subHTML}</div>`, icon: SVG_ICONS.book }
-    ];
+    );
   } else if (role === 'hod') {
     rolePanelTitle.textContent = 'Department Head Specifications';
-    fields = [
+    fields.push(
       { label: 'HOD Designation', value: `Head of ${profile.department || 'N/A'} Department`, icon: SVG_ICONS.dept },
       { label: 'Department Faculty Staff', value: `${profile.deptFacultyCount || 0} Faculty Members`, icon: SVG_ICONS.users },
       { label: 'Enrolled Department Students', value: `${profile.deptStudentCount || 0} Active Students`, icon: SVG_ICONS.graduation }
-    ];
+    );
   } else if (role === 'admin') {
     rolePanelTitle.textContent = 'System Administration Rights';
-    fields = [
+    fields.push(
       { label: 'Administration Scope', value: 'Global Institutional Administrator', icon: SVG_ICONS.shield },
-      { label: 'Privilege Level', value: 'Superuser Access (Users, Timetables, Logs)', icon: SVG_ICONS.shield }
-    ];
+      { label: 'System Privileges', value: 'Superuser Access (Users, Timetables, Logs)', icon: SVG_ICONS.shield }
+    );
   }
 
   roleGrid.innerHTML = fields.map(f => `
@@ -139,8 +142,10 @@ function setupEditModal(profile) {
   const form = document.getElementById('edit-profile-form');
   const nameInput = document.getElementById('edit-name-input');
   const emailInput = document.getElementById('edit-email-input');
+  const mobileInput = document.getElementById('edit-mobile-input');
 
-  const isStaffOrAdmin = ['admin', 'hod', 'faculty'].includes((profile.role || '').toLowerCase());
+  const roleClean = (profile.role || '').toLowerCase();
+  const isStaffOrAdmin = ['admin', 'hod', 'faculty'].includes(roleClean);
 
   if (isStaffOrAdmin) {
     if (editBtn) editBtn.style.display = 'flex';
@@ -156,6 +161,7 @@ function setupEditModal(profile) {
     if (e) e.preventDefault();
     if (nameInput) nameInput.value = profile.name || '';
     if (emailInput) emailInput.value = profile.email || '';
+    if (mobileInput) mobileInput.value = profile.mobile || profile.phone || '';
     modal.classList.add('show');
   };
 
@@ -174,6 +180,7 @@ function setupEditModal(profile) {
       e.preventDefault();
       const newName = nameInput ? nameInput.value.trim() : '';
       const newEmail = emailInput ? emailInput.value.trim() : '';
+      const newMobile = mobileInput ? mobileInput.value.trim() : '';
 
       if (!newName) {
         showToast('Full Name is required.', 'error');
@@ -189,7 +196,7 @@ function setupEditModal(profile) {
       try {
         const res = await apiFetch('/auth/me', {
           method: 'PUT',
-          body: JSON.stringify({ name: newName, email: newEmail })
+          body: JSON.stringify({ name: newName, email: newEmail, mobile: newMobile })
         });
 
         if (saveBtn) {
@@ -201,6 +208,7 @@ function setupEditModal(profile) {
           showToast('Profile details updated successfully!', 'success');
           profile.name = newName;
           profile.email = newEmail;
+          profile.mobile = newMobile;
 
           // Update session in localStorage
           const sessionStr = localStorage.getItem('sat_session');
@@ -209,6 +217,7 @@ function setupEditModal(profile) {
               const sess = JSON.parse(sessionStr);
               sess.user.name = newName;
               sess.user.email = newEmail;
+              sess.user.mobile = newMobile;
               localStorage.setItem('sat_session', JSON.stringify(sess));
             } catch (err) {}
           }
