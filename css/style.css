@@ -542,6 +542,10 @@ button, input, select, textarea {
   background-color: #fafbfc;
 }
 
+.faculty-profile-row:hover {
+  background-color: rgba(79, 70, 229, 0.04) !important;
+}
+
 /* Timetable Grid Builder (Admin/HOD) */
 .timetable-grid-container {
   display: flex;

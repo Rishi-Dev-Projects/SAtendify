@@ -100,10 +100,20 @@ function getPageTitleForTab(tab) {
 }
 
 // Modal Utility functions
-function openModal(title, contentHTML, onSaveCallback) {
+function openModal(title, contentHTML, onSaveCallback, options = {}) {
   modalTitle.textContent = title;
   modalContent.innerHTML = contentHTML;
   currentSaveCallback = onSaveCallback;
+
+  const saveBtn = document.getElementById('modal-save-btn');
+  if (saveBtn) {
+    saveBtn.style.display = onSaveCallback ? 'inline-flex' : 'none';
+  }
+
+  if (options && options.customFooter) {
+    modalContent.insertAdjacentHTML('beforeend', `<div class="modal-footer-custom" style="margin-top:20px; text-align:right;">${options.customFooter}</div>`);
+  }
+
   modalBackdrop.classList.add('show');
 }
 
@@ -111,6 +121,10 @@ function closeModal() {
   modalBackdrop.classList.remove('show');
   modalContent.innerHTML = '';
   currentSaveCallback = null;
+  const saveBtn = document.getElementById('modal-save-btn');
+  if (saveBtn) {
+    saveBtn.style.display = 'inline-flex';
+  }
 }
 
 async function handleModalSubmit(e) {
@@ -693,19 +707,21 @@ async function renderFacultyTab() {
     rowsContainer.innerHTML = filtered.map(f => {
       const showPromote = f.role === 'faculty';
       return `
-        <tr>
+        <tr class="faculty-profile-row" data-id="${f.id}" style="cursor: pointer;">
           <td>
             <div style="display: flex; align-items: center; gap: 10px;">
-              <span class="avatar" style="width:30px; height:30px; font-size: 0.775rem;">${(f.name || 'F').split(' ').map(n => n[0]).join('').substring(0, 2)}</span>
-              <span><strong>${f.name}</strong></span>
+              <span class="avatar" style="width:34px; height:34px; font-size: 0.8rem; background: var(--color-accent); color: #ffffff;">${(f.name || 'F').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}</span>
+              <div>
+                <strong style="color: var(--color-primary); font-size: 0.925rem; display: block;">${f.name}</strong>
+                <span style="font-size: 0.725rem; color: var(--color-accent); font-weight: 600;">View Profile Details &rarr;</span>
+              </div>
             </div>
           </td>
           <td><span style="font-family: monospace; color: var(--text-secondary);">${f.email}</span></td>
           <td><span class="badge ${f.role === 'hod' ? 'badge-warning' : 'badge-success'}">${f.role.toUpperCase()}</span></td>
           <td><span class="badge badge-${(f.department || 'it').toLowerCase()}">${f.department || 'GEN'}</span></td>
-          <td style="text-align: right;">
+          <td style="text-align: right;" onclick="event.stopPropagation();">
             ${showPromote ? `<button class="btn btn-secondary btn-promote-hod" data-id="${f.id}" style="padding: 6px 10px; font-size: 0.8rem; border-color: var(--color-warning); color: #d97706; background-color: var(--color-warning-subtle);">Make HOD</button>` : ''}
-            <button class="btn btn-secondary btn-edit-faculty" data-id="${f.id}" style="padding: 6px 10px; font-size: 0.8rem;">Edit</button>
             <button class="btn btn-danger btn-delete-faculty" data-id="${f.id}" style="padding: 6px 10px; font-size: 0.8rem;">Delete</button>
           </td>
         </tr>
@@ -719,9 +735,9 @@ async function renderFacultyTab() {
   document.getElementById('btn-add-faculty').addEventListener('click', openAddFacultyModal);
 
   document.getElementById('faculty-table-rows').addEventListener('click', async (e) => {
-    const editBtn = e.target.closest('.btn-edit-faculty');
     const deleteBtn = e.target.closest('.btn-delete-faculty');
     const promoteBtn = e.target.closest('.btn-promote-hod');
+    const profileRow = e.target.closest('.faculty-profile-row');
 
     if (promoteBtn) {
       const fId = promoteBtn.dataset.id;
@@ -736,12 +752,7 @@ async function renderFacultyTab() {
           await renderFacultyTab();
         }
       }
-    }
-
-    if (editBtn) {
-      const fId = editBtn.dataset.id;
-      const targetFac = staff.find(f => f.id === fId);
-      if (targetFac) openEditFacultyModal(targetFac);
+      return;
     }
 
     if (deleteBtn) {
@@ -754,10 +765,129 @@ async function renderFacultyTab() {
           await renderFacultyTab();
         }
       }
+      return;
+    }
+
+    if (profileRow) {
+      const fId = profileRow.dataset.id;
+      const targetFac = staff.find(f => f.id === fId);
+      if (targetFac) {
+        openFacultyProfileModal(targetFac);
+      }
     }
   });
 
   drawFaculty();
+}
+
+function openFacultyProfileModal(f) {
+  const subjects = getDB('sat_subjects') || [];
+  const assignedSubs = (f.assignedSubjects || []).map(sId => {
+    const sObj = subjects.find(s => s.id === sId);
+    return sObj ? `${sObj.code || ''} ${sObj.name || sId}` : sId;
+  });
+
+  const initials = f.name ? f.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'F';
+  const subHTML = assignedSubs.length > 0
+    ? assignedSubs.map(s => `<span class="badge badge-primary" style="margin: 2px;">${s}</span>`).join(' ')
+    : '<span style="font-size:0.85rem; color:var(--text-muted);">No courses assigned</span>';
+
+  const modalHTML = `
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <!-- Hero Header Card -->
+      <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; text-align: center;">
+        <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, var(--color-accent) 0%, #818cf8 100%); color: #fff; font-size: 1.6rem; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px auto; box-shadow: 0 4px 12px rgba(79,70,229,0.25); border: 2px solid #fff;">
+          ${initials}
+        </div>
+        <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">${f.name}</h3>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
+          <span class="badge ${f.role === 'hod' ? 'badge-warning' : 'badge-success'}">${f.role.toUpperCase()}</span>
+          <span class="badge badge-${(f.department || 'it').toLowerCase()}">${f.department || 'GEN'} STREAM</span>
+          <span class="badge badge-success">● ACTIVE</span>
+        </div>
+      </div>
+
+      <!-- Identity & Account Details -->
+      <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1.5px solid var(--border-color);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          Identity & Account Details
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Full Name</div>
+            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.name}</div>
+          </div>
+          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Mobile Number</div>
+            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.mobile || f.phone || 'N/A'}</div>
+          </div>
+          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Email Address</div>
+            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px; word-break: break-all;">${f.email || 'N/A'}</div>
+          </div>
+          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">System Role</div>
+            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${(f.role || 'faculty').toUpperCase()}</div>
+          </div>
+          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Department Stream</div>
+            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.department || 'General'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Academic Portfolio -->
+      <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1.5px solid var(--border-color);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+          Faculty Academic Portfolio
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Assigned Department</div>
+            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.department || 'N/A'} Department</div>
+          </div>
+          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Active Courses Count</div>
+            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${assignedSubs.length} Courses</div>
+          </div>
+        </div>
+        <div style="margin-top: 10px; background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+          <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px;">Assigned Courses</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px;">${subHTML}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  openModal(`Faculty Profile Details`, modalHTML, null, {
+    customFooter: `
+      <div style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
+        <button type="button" class="btn btn-secondary" id="btn-close-fac-profile-modal">Close</button>
+        <button type="button" class="btn btn-primary" id="btn-edit-fac-from-profile-modal" style="display: flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          Edit Faculty Details
+        </button>
+      </div>
+    `
+  });
+
+  setTimeout(() => {
+    const editBtnModal = document.getElementById('btn-edit-fac-from-profile-modal');
+    const closeBtnModal = document.getElementById('btn-close-fac-profile-modal');
+
+    if (closeBtnModal) {
+      closeBtnModal.onclick = () => closeModal();
+    }
+    if (editBtnModal) {
+      editBtnModal.onclick = () => {
+        closeModal();
+        openEditFacultyModal(f);
+      };
+    }
+  }, 50);
+}
 }
 
 function openAddFacultyModal() {
@@ -1323,7 +1453,7 @@ async function renderTimetableTab() {
           const sub = subjects.find(s => s.id === cellVal.subjectId);
           const fac = users.find(u => u.id === cellVal.facultyId);
           const isStart = p.num === cellVal.period;
-          const typeLabel = cellVal.type === 'lab' ? 'Lab' : cellVal.type === 'tutorial' ? 'Tutorial' : '';
+          const typeLabel = cellVal.type === 'lab' ? '🔬 Lab' : cellVal.type === 'tutorial' ? '📖 Tut' : '';
 
           if (isStart) {
             gridHTML += `
@@ -1331,9 +1461,9 @@ async function renderTimetableTab() {
                 <div>
                   <button class="cell-action-delete" data-id="${cellVal.id}">&times;</button>
                   <div class="cell-subject">${sub ? sub.name : 'Unknown'} ${typeLabel ? `<span style="font-size:0.7rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 4px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''}</div>
-                  <div class="cell-faculty">${fac ? fac.name.replace('Prof. ', '').replace('Dr. ', '') : 'Faculty'}</div>
+                  <div class="cell-faculty">👨‍🏫 ${fac ? fac.name.replace('Prof. ', '').replace('Dr. ', '') : 'Faculty'}</div>
                 </div>
-                <div class="cell-room">Room ${cellVal.room}</div>
+                <div class="cell-room">🚪 ${cellVal.room}</div>
               </div>
             `;
           } else {
@@ -1343,7 +1473,7 @@ async function renderTimetableTab() {
                 <div style="font-size:0.75rem; color:var(--text-secondary); font-style:italic;">
                   (Continuation of ${sub ? sub.code : 'lecture'})
                 </div>
-                <div class="cell-room">Room ${cellVal.room}</div>
+                <div class="cell-room">🚪 ${cellVal.room}</div>
               </div>
             `;
           }
