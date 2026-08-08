@@ -73,6 +73,8 @@ function renderProfileData(profile) {
   // Identity Panel
   document.getElementById('val-name').textContent = profile.name || 'N/A';
   document.getElementById('val-email').textContent = profile.email || 'N/A';
+  const mobileElem = document.getElementById('val-mobile');
+  if (mobileElem) mobileElem.textContent = profile.mobile || profile.phone || 'N/A';
   document.getElementById('val-role').textContent = (profile.role || 'N/A').toUpperCase();
   document.getElementById('val-dept').textContent = profile.department ? `${profile.department} Department` : 'General / All';
 
@@ -81,18 +83,16 @@ function renderProfileData(profile) {
   const roleGrid = document.getElementById('role-field-grid');
   const role = profile.role;
 
-  let fields = [
-    { label: 'Mobile Number', value: profile.mobile || profile.phone || 'N/A', icon: SVG_ICONS.phone }
-  ];
+  let fields = [];
 
   if (role === 'student') {
     rolePanelTitle.textContent = 'Student Enrollment Record';
-    fields.push(
+    fields = [
       { label: 'Roll Number', value: `<span style="color:var(--color-accent); font-weight:800;">${profile.rollNumber || 'N/A'}</span>`, icon: SVG_ICONS.roll },
       { label: 'Date of Birth', value: formatDOB(profile.dob), icon: SVG_ICONS.calendar },
       { label: 'Academic Semester', value: `Semester ${profile.semester || 'N/A'}`, icon: SVG_ICONS.graduation },
       { label: 'Class Division / Batch', value: `Batch ${profile.division || 'N/A'}`, icon: SVG_ICONS.batch }
-    );
+    ];
   } else if (role === 'faculty') {
     rolePanelTitle.textContent = 'Faculty Academic Portfolio';
     const subs = profile.subjects || [];
@@ -100,24 +100,24 @@ function renderProfileData(profile) {
       ? subs.map(s => `<span class="badge badge-primary" style="margin: 2px;">${s.code || ''} ${s.name || s}</span>`).join(' ')
       : '<span style="font-size:0.85rem; color:var(--text-muted);">No courses assigned</span>';
 
-    fields.push(
+    fields = [
       { label: 'Assigned Department', value: `${profile.department || 'N/A'} Department`, icon: SVG_ICONS.dept },
       { label: 'Active Courses Count', value: `${subs.length} Courses Assigned`, icon: SVG_ICONS.book },
       { label: 'Assigned Courses', value: `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">${subHTML}</div>`, icon: SVG_ICONS.book }
-    );
+    ];
   } else if (role === 'hod') {
     rolePanelTitle.textContent = 'Department Head Specifications';
-    fields.push(
+    fields = [
       { label: 'HOD Designation', value: `Head of ${profile.department || 'N/A'} Department`, icon: SVG_ICONS.dept },
       { label: 'Department Faculty Staff', value: `${profile.deptFacultyCount || 0} Faculty Members`, icon: SVG_ICONS.users },
       { label: 'Enrolled Department Students', value: `${profile.deptStudentCount || 0} Active Students`, icon: SVG_ICONS.graduation }
-    );
+    ];
   } else if (role === 'admin') {
     rolePanelTitle.textContent = 'System Administration Rights';
-    fields.push(
+    fields = [
       { label: 'Administration Scope', value: 'Global Institutional Administrator', icon: SVG_ICONS.shield },
       { label: 'System Privileges', value: 'Superuser Access (Users, Timetables, Logs)', icon: SVG_ICONS.shield }
-    );
+    ];
   }
 
   roleGrid.innerHTML = fields.map(f => `
