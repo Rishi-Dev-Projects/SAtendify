@@ -152,14 +152,16 @@ function setupEditModal(profile) {
 
   if (!isStaffOrAdmin || !modal) return;
 
-  const openModal = () => {
+  const openModal = (e) => {
+    if (e) e.preventDefault();
     if (nameInput) nameInput.value = profile.name || '';
     if (emailInput) emailInput.value = profile.email || '';
-    modal.style.display = 'flex';
+    modal.classList.add('show');
   };
 
-  const closeModal = () => {
-    modal.style.display = 'none';
+  const closeModal = (e) => {
+    if (e) e.preventDefault();
+    modal.classList.remove('show');
   };
 
   if (editBtn) editBtn.onclick = openModal;

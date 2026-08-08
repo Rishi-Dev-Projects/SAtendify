@@ -246,18 +246,18 @@
   </div>
 
   <!-- EDIT PROFILE MODAL (Staff & Admin Only) -->
-  <div class="modal-backdrop" id="edit-profile-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 999; align-items: center; justify-content: center; padding: 20px;">
-    <div class="panel-card" style="width: 100%; max-width: 480px; background: #ffffff; border-radius: var(--radius-lg); box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
-      <div class="panel-header" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--border-color); padding-bottom: 12px;">
-        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Edit Profile Details</h3>
-        <button id="modal-close-btn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+  <div class="modal-backdrop" id="edit-profile-modal">
+    <div class="modal-window" style="max-width: 480px;">
+      <div class="modal-title-bar" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--border-color);">
+        <h3 class="modal-title" style="margin: 0; font-size: 1.1rem; font-weight: 700;">Edit Profile Details</h3>
+        <button class="modal-close" id="modal-close-btn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
       </div>
-      <form id="edit-profile-form" style="padding-top: 16px;">
+      <form id="edit-profile-form" style="padding: 24px;">
         <div class="form-group" style="margin-bottom: 16px;">
           <label for="edit-name-input" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Full Name</label>
           <input type="text" class="form-control" id="edit-name-input" required placeholder="Enter full name" style="width: 100%; box-sizing: border-box;">
         </div>
-        <div class="form-group" style="margin-bottom: 20px;">
+        <div class="form-group" style="margin-bottom: 24px;">
           <label for="edit-email-input" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Email Address</label>
           <input type="email" class="form-control" id="edit-email-input" required placeholder="Enter email address" style="width: 100%; box-sizing: border-box;">
         </div>
