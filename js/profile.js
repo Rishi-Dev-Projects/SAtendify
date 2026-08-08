@@ -140,7 +140,7 @@ function setupEditModal(profile) {
   const nameInput = document.getElementById('edit-name-input');
   const emailInput = document.getElementById('edit-email-input');
 
-  const isStaffOrAdmin = ['admin', 'hod', 'faculty'].includes(profile.role);
+  const isStaffOrAdmin = ['admin', 'hod', 'faculty'].includes((profile.role || '').toLowerCase());
 
   if (isStaffOrAdmin) {
     if (editBtn) editBtn.style.display = 'flex';
@@ -153,8 +153,8 @@ function setupEditModal(profile) {
   if (!isStaffOrAdmin || !modal) return;
 
   const openModal = () => {
-    nameInput.value = profile.name || '';
-    emailInput.value = profile.email || '';
+    if (nameInput) nameInput.value = profile.name || '';
+    if (emailInput) emailInput.value = profile.email || '';
     modal.style.display = 'flex';
   };
 
@@ -162,50 +162,67 @@ function setupEditModal(profile) {
     modal.style.display = 'none';
   };
 
-  if (editBtn) editBtn.addEventListener('click', openModal);
-  if (closeBtn) closeBtn.addEventListener('click', closeModal);
-  if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+  if (editBtn) editBtn.onclick = openModal;
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (cancelBtn) cancelBtn.onclick = closeModal;
+  modal.onclick = (e) => { if (e.target === modal) closeModal(); };
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const newName = nameInput.value.trim();
-    const newEmail = emailInput.value.trim();
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const newName = nameInput ? nameInput.value.trim() : '';
+      const newEmail = emailInput ? emailInput.value.trim() : '';
 
-    if (!newName) {
-      showToast('Full Name is required.', 'error');
-      return;
-    }
-
-    const saveBtn = document.getElementById('btn-save-profile');
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving...';
-
-    const res = await apiFetch('/auth/me', {
-      method: 'PUT',
-      body: JSON.stringify({ name: newName, email: newEmail })
-    });
-
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'Save Changes';
-
-    if (res && res.success) {
-      showToast('Profile updated successfully!', 'success');
-      profile.name = newName;
-      profile.email = newEmail;
-
-      // Update session in localStorage
-      const sessionStr = localStorage.getItem('sat_session');
-      if (sessionStr) {
-        try {
-          const sess = JSON.parse(sessionStr);
-          sess.user.name = newName;
-          sess.user.email = newEmail;
-          localStorage.setItem('sat_session', JSON.stringify(sess));
-        } catch (err) {}
+      if (!newName) {
+        showToast('Full Name is required.', 'error');
+        return;
       }
 
-      renderProfileData(profile);
-      closeModal();
-    }
-  });
+      const saveBtn = document.getElementById('btn-save-profile');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+      }
+
+      try {
+        const res = await apiFetch('/auth/me', {
+          method: 'PUT',
+          body: JSON.stringify({ name: newName, email: newEmail })
+        });
+
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Changes';
+        }
+
+        if (res && res.success) {
+          showToast('Profile details updated successfully!', 'success');
+          profile.name = newName;
+          profile.email = newEmail;
+
+          // Update session in localStorage
+          const sessionStr = localStorage.getItem('sat_session');
+          if (sessionStr) {
+            try {
+              const sess = JSON.parse(sessionStr);
+              sess.user.name = newName;
+              sess.user.email = newEmail;
+              localStorage.setItem('sat_session', JSON.stringify(sess));
+            } catch (err) {}
+          }
+
+          renderProfileData(profile);
+          closeModal();
+        } else {
+          showToast((res && res.error) ? res.error : 'Failed to update profile.', 'error');
+        }
+      } catch (err) {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Changes';
+        }
+        showToast(err.message || 'Error updating profile', 'error');
+      }
+    };
+  }
 }

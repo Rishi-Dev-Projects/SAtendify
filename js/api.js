@@ -207,6 +207,25 @@ async function handleMockApi(endpoint, options) {
   }
 
   // MATCH ROUTES
+  if (endpoint === '/auth/me') {
+    if (method === 'GET') {
+      return { success: true, data: currUser };
+    } else if (method === 'PUT') {
+      if (body && body.name) currUser.name = body.name;
+      if (body && body.email) currUser.email = body.email;
+      
+      const sessionStr = localStorage.getItem('sat_session');
+      if (sessionStr) {
+        try {
+          const sess = JSON.parse(sessionStr);
+          sess.user.name = currUser.name;
+          sess.user.email = currUser.email;
+          localStorage.setItem('sat_session', JSON.stringify(sess));
+        } catch (e) {}
+      }
+      return { success: true, message: 'Profile details updated successfully!' };
+    }
+  }
 
   // -- ADMIN & HOD ANALYTICS --
   if (endpoint.startsWith('/admin/analytics') || endpoint.startsWith('/hod/analytics')) {
