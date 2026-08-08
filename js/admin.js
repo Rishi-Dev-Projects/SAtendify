@@ -627,10 +627,15 @@ async function renderFacultyTab() {
   const container = document.getElementById('dashboard-content');
   container.innerHTML = `<div class="skeleton-bar" style="width: 100%; height: 300px;"></div>`;
 
-  const res = await apiFetch('/admin/users');
-  if (!res.success) return;
+  const [usersRes, subsRes] = await Promise.all([
+    apiFetch('/admin/users'),
+    apiFetch('/admin/subjects')
+  ]);
 
-  const staff = res.data.filter(u => u.role === 'faculty' || u.role === 'hod');
+  if (!usersRes.success) return;
+
+  const staff = usersRes.data.filter(u => u.role === 'faculty' || u.role === 'hod');
+  const subjects = subsRes.success ? subsRes.data : [];
 
   container.innerHTML = `
     <div class="panel-card">
@@ -741,7 +746,7 @@ async function renderFacultyTab() {
 
     if (promoteBtn) {
       const fId = promoteBtn.dataset.id;
-      const targetFac = staff.find(f => f.id === fId);
+      const targetFac = staff.find(f => String(f.id) === String(fId));
       if (confirm(`Are you sure you want to promote ${targetFac ? targetFac.name : 'this faculty'} to HOD of ${targetFac ? targetFac.department : ''} department?`)) {
         const promoteRes = await apiFetch(`/admin/users/${fId}`, {
           method: 'PUT',
@@ -757,7 +762,7 @@ async function renderFacultyTab() {
 
     if (deleteBtn) {
       const fId = deleteBtn.dataset.id;
-      const targetFac = staff.find(f => f.id === fId);
+      const targetFac = staff.find(f => String(f.id) === String(fId));
       if (confirm(`Are you sure you want to delete staff account for ${targetFac ? targetFac.name : 'this faculty'}?`)) {
         const delRes = await apiFetch(`/admin/users/${fId}`, { method: 'DELETE' });
         if (delRes.success) {
@@ -770,9 +775,9 @@ async function renderFacultyTab() {
 
     if (profileRow) {
       const fId = profileRow.dataset.id;
-      const targetFac = staff.find(f => f.id === fId);
+      const targetFac = staff.find(f => String(f.id) === String(fId));
       if (targetFac) {
-        openFacultyProfileModal(targetFac);
+        openFacultyProfileModal(targetFac, subjects);
       }
     }
   });
@@ -780,11 +785,13 @@ async function renderFacultyTab() {
   drawFaculty();
 }
 
-function openFacultyProfileModal(f) {
-  const subjects = getDB('sat_subjects') || [];
-  const assignedSubs = (f.assignedSubjects || []).map(sId => {
-    const sObj = subjects.find(s => s.id === sId);
-    return sObj ? `${sObj.code || ''} ${sObj.name || sId}` : sId;
+function openFacultyProfileModal(f, subjects = []) {
+  const assignedSubs = (f.assignedSubjects || f.subjects || []).map(s => {
+    if (typeof s === 'object' && s !== null) {
+      return `${s.code || ''} ${s.name || s.id || ''}`;
+    }
+    const sObj = subjects.find(sub => String(sub.id) === String(s));
+    return sObj ? `${sObj.code || ''} ${sObj.name || s}` : String(s);
   });
 
   const initials = f.name ? f.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'F';
