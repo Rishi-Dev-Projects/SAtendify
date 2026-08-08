@@ -888,7 +888,6 @@ function openFacultyProfileModal(f) {
     }
   }, 50);
 }
-}
 
 function openAddFacultyModal() {
   const contentHTML = `
