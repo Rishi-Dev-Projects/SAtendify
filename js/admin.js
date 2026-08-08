@@ -47,9 +47,17 @@ async function initAdminDashboard(forcedTab = null) {
   }
 
   // Modal exit bindings
-  modalClose.addEventListener('click', closeModal);
-  modalCancel.addEventListener('click', closeModal);
-  modalForm.addEventListener('submit', handleModalSubmit);
+  if (modalClose) modalClose.onclick = () => closeModal();
+  if (modalCancel) modalCancel.onclick = () => closeModal();
+  if (modalBackdrop) {
+    modalBackdrop.onclick = (e) => {
+      if (e.target === modalBackdrop) closeModal();
+    };
+  }
+  window.onkeydown = (e) => {
+    if (e.key === 'Escape') closeModal();
+  };
+  if (modalForm) modalForm.onsubmit = handleModalSubmit;
 
   // Parse active tab parameter
   const urlParams = new URLSearchParams(window.location.search);
@@ -952,20 +960,22 @@ function openFacultyProfileModal(f, subjects = []) {
     `
   });
 
-  setTimeout(() => {
-    const editBtnModal = document.getElementById('btn-edit-fac-from-profile-modal');
-    const closeBtnModal = document.getElementById('btn-close-fac-profile-modal');
+  const editBtnModal = document.getElementById('btn-edit-fac-from-profile-modal');
+  const closeBtnModal = document.getElementById('btn-close-fac-profile-modal');
 
-    if (closeBtnModal) {
-      closeBtnModal.onclick = () => closeModal();
-    }
-    if (editBtnModal) {
-      editBtnModal.onclick = () => {
-        closeModal();
-        openEditFacultyModal(f);
-      };
-    }
-  }, 50);
+  if (closeBtnModal) {
+    closeBtnModal.onclick = (e) => {
+      e.preventDefault();
+      closeModal();
+    };
+  }
+  if (editBtnModal) {
+    editBtnModal.onclick = (e) => {
+      e.preventDefault();
+      closeModal();
+      openEditFacultyModal(f);
+    };
+  }
 }
 
 function openAddFacultyModal() {
