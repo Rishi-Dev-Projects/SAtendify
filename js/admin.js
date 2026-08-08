@@ -105,13 +105,23 @@ function openModal(title, contentHTML, onSaveCallback, options = {}) {
   modalContent.innerHTML = contentHTML;
   currentSaveCallback = onSaveCallback;
 
+  const modalWin = document.getElementById('modal-window');
+  if (modalWin) {
+    modalWin.style.maxWidth = (options && options.maxWidth) ? options.maxWidth : '500px';
+  }
+
   const saveBtn = document.getElementById('modal-save-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+
   if (saveBtn) {
     saveBtn.style.display = onSaveCallback ? 'inline-flex' : 'none';
   }
+  if (cancelBtn) {
+    cancelBtn.style.display = (options && options.hideCancel) ? 'none' : 'inline-flex';
+  }
 
   if (options && options.customFooter) {
-    modalContent.insertAdjacentHTML('beforeend', `<div class="modal-footer-custom" style="margin-top:20px; text-align:right;">${options.customFooter}</div>`);
+    modalContent.insertAdjacentHTML('beforeend', `<div class="modal-footer-custom">${options.customFooter}</div>`);
   }
 
   modalBackdrop.classList.add('show');
@@ -121,10 +131,14 @@ function closeModal() {
   modalBackdrop.classList.remove('show');
   modalContent.innerHTML = '';
   currentSaveCallback = null;
-  const saveBtn = document.getElementById('modal-save-btn');
-  if (saveBtn) {
-    saveBtn.style.display = 'inline-flex';
+  const modalWin = document.getElementById('modal-window');
+  if (modalWin) {
+    modalWin.style.maxWidth = '500px';
   }
+  const saveBtn = document.getElementById('modal-save-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+  if (saveBtn) saveBtn.style.display = 'inline-flex';
+  if (cancelBtn) cancelBtn.style.display = 'inline-flex';
 }
 
 async function handleModalSubmit(e) {
@@ -796,84 +810,142 @@ function openFacultyProfileModal(f, subjects = []) {
 
   const initials = f.name ? f.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'F';
   const subHTML = assignedSubs.length > 0
-    ? assignedSubs.map(s => `<span class="badge badge-primary" style="margin: 2px;">${s}</span>`).join(' ')
-    : '<span style="font-size:0.85rem; color:var(--text-muted);">No courses assigned</span>';
+    ? assignedSubs.map(s => `<span class="badge badge-primary" style="margin: 3px 2px; padding: 5px 10px; font-size: 0.78rem; font-weight: 600;">${s}</span>`).join('')
+    : '<span style="font-size:0.85rem; color:var(--text-muted); font-style: italic;">No active courses assigned</span>';
+
+  // Vector SVG Icons
+  const svgUser = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+  const svgPhone = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>`;
+  const svgMail = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>`;
+  const svgShield = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`;
+  const svgDept = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"></rect><path d="M9 22v-4h6v4"></path><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line></svg>`;
+  const svgBook = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
 
   const modalHTML = `
-    <div style="display: flex; flex-direction: column; gap: 18px;">
-      <!-- Hero Header Card -->
-      <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; text-align: center;">
-        <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, var(--color-accent) 0%, #818cf8 100%); color: #fff; font-size: 1.6rem; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px auto; box-shadow: 0 4px 12px rgba(79,70,229,0.25); border: 2px solid #fff;">
+    <div style="display: flex; flex-direction: column; gap: 18px; padding: 4px 0;">
+      
+      <!-- HERO HEADER CARD -->
+      <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 22px; text-align: center; box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);">
+        <div style="width: 76px; height: 76px; border-radius: 50%; background: linear-gradient(135deg, var(--color-accent) 0%, #818cf8 100%); color: #ffffff; font-size: 1.9rem; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; box-shadow: 0 8px 18px rgba(79,70,229,0.25); border: 3px solid #ffffff;">
           ${initials}
         </div>
-        <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">${f.name}</h3>
-        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
-          <span class="badge ${f.role === 'hod' ? 'badge-warning' : 'badge-success'}">${f.role.toUpperCase()}</span>
-          <span class="badge badge-${(f.department || 'it').toLowerCase()}">${f.department || 'GEN'} STREAM</span>
-          <span class="badge badge-success">● ACTIVE</span>
+        <h3 style="margin: 0 0 6px 0; font-size: 1.25rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.2px;">${f.name}</h3>
+        
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px;">
+          <span class="badge ${f.role === 'hod' ? 'badge-warning' : 'badge-success'}" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; padding: 4px 10px;">${f.role.toUpperCase()}</span>
+          <span class="badge" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.75rem; font-weight: 600; padding: 4px 10px;">${f.department || 'GEN'} STREAM</span>
+          <span class="badge badge-success" style="font-size: 0.75rem; padding: 4px 10px;">● ACTIVE ACCOUNT</span>
         </div>
       </div>
 
-      <!-- Identity & Account Details -->
-      <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
-        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1.5px solid var(--border-color);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          Identity & Account Details
+      <!-- PANEL 1: IDENTITY & ACCOUNT DETAILS -->
+      <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+        <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 2px solid var(--border-color); margin-bottom: 14px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <h4 style="margin: 0; font-size: 1.025rem; font-weight: 700; color: var(--text-primary);">Identity & Account Details</h4>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
-          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Full Name</div>
-            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.name}</div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+          
+          <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--color-accent-subtle); color: var(--color-accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              ${svgUser}
+            </div>
+            <div>
+              <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Full Name</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.name}</div>
+            </div>
           </div>
-          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Mobile Number</div>
-            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.mobile || f.phone || 'N/A'}</div>
+
+          <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--color-accent-subtle); color: var(--color-accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              ${svgPhone}
+            </div>
+            <div>
+              <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Mobile Number</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.mobile || f.phone || 'N/A'}</div>
+            </div>
           </div>
-          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Email Address</div>
-            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px; word-break: break-all;">${f.email || 'N/A'}</div>
+
+          <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--color-accent-subtle); color: var(--color-accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              ${svgMail}
+            </div>
+            <div>
+              <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Email Address</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 2px; word-break: break-all;">${f.email || 'N/A'}</div>
+            </div>
           </div>
-          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">System Role</div>
-            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${(f.role || 'faculty').toUpperCase()}</div>
+
+          <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--color-accent-subtle); color: var(--color-accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              ${svgShield}
+            </div>
+            <div>
+              <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">System Role</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${(f.role || 'faculty').toUpperCase()}</div>
+            </div>
           </div>
-          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Department Stream</div>
-            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.department || 'General'}</div>
+
+          <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--color-accent-subtle); color: var(--color-accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              ${svgDept}
+            </div>
+            <div>
+              <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Department Stream</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.department || 'General'} Department</div>
+            </div>
           </div>
+
         </div>
       </div>
 
-      <!-- Academic Portfolio -->
-      <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
-        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1.5px solid var(--border-color);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
-          Faculty Academic Portfolio
+      <!-- PANEL 2: ACADEMIC PORTFOLIO -->
+      <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+        <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 2px solid var(--border-color); margin-bottom: 14px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+          <h4 style="margin: 0; font-size: 1.025rem; font-weight: 700; color: var(--text-primary);">Faculty Academic Portfolio</h4>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
-          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Assigned Department</div>
-            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.department || 'N/A'} Department</div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
+          <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--color-accent-subtle); color: var(--color-accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              ${svgDept}
+            </div>
+            <div>
+              <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Assigned Department</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${f.department || 'N/A'} Stream</div>
+            </div>
           </div>
-          <div style="background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Active Courses Count</div>
-            <div style="font-weight: 700; color: var(--text-primary); margin-top: 2px;">${assignedSubs.length} Courses</div>
+
+          <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--color-accent-subtle); color: var(--color-accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              ${svgBook}
+            </div>
+            <div>
+              <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Active Courses Count</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${assignedSubs.length} Courses Assigned</div>
+            </div>
           </div>
         </div>
-        <div style="margin-top: 10px; background: var(--bg-primary); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-          <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px;">Assigned Courses</div>
-          <div style="display: flex; flex-wrap: wrap; gap: 4px;">${subHTML}</div>
+
+        <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px;">
+          <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Assigned Courses & Subjects</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">${subHTML}</div>
         </div>
       </div>
+
     </div>
   `;
 
   openModal(`Faculty Profile Details`, modalHTML, null, {
+    maxWidth: '660px',
+    hideCancel: true,
     customFooter: `
-      <div style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
-        <button type="button" class="btn btn-secondary" id="btn-close-fac-profile-modal">Close</button>
-        <button type="button" class="btn btn-primary" id="btn-edit-fac-from-profile-modal" style="display: flex; align-items: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      <div style="display: flex; justify-content: flex-end; gap: 12px; width: 100%; border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 12px;">
+        <button type="button" class="btn btn-secondary" id="btn-close-fac-profile-modal" style="font-weight: 600;">Close</button>
+        <button type="button" class="btn btn-primary" id="btn-edit-fac-from-profile-modal" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
           Edit Faculty Details
         </button>
       </div>
