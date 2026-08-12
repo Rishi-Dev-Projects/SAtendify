@@ -41,7 +41,7 @@ function renderSidebar(user, activeTab) {
     linksHTML = `
       <li class="nav-item ${activeTab === 'profile' ? 'active' : ''}"><a href="profile.html">My Profile</a></li>
       <li class="nav-item ${activeTab === 'overview' ? 'active' : ''}"><a href="hod.html?tab=overview">Dashboard</a></li>
-      <li class="nav-item ${activeTab === 'faculty' ? 'active' : ''}"><a href="hod.html?tab=faculty">Faculty Assignments</a></li>
+      <li class="nav-item ${activeTab === 'faculty' ? 'active' : ''}"><a href="hod.html?tab=faculty">Faculty</a></li>
       <li class="nav-item ${activeTab === 'proxies' ? 'active' : ''}"><a href="hod.html?tab=proxies">Proxy Allocations</a></li>
       <li class="nav-item ${activeTab === 'students' ? 'active' : ''}"><a href="hod.html?tab=students">Students</a></li>
       <li class="nav-item ${activeTab === 'timetable' ? 'active' : ''}"><a href="hod.html?tab=timetable">Timetable</a></li>
