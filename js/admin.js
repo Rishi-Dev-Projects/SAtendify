@@ -136,6 +136,7 @@ function openModal(title, contentHTML, onSaveCallback, options = {}) {
 
   modalBackdrop.classList.add('show');
 }
+window.openModal = openModal;
 
 function closeModal() {
   modalBackdrop.classList.remove('show');
@@ -156,6 +157,7 @@ function closeModal() {
     if (cancelBtn) cancelBtn.onclick = () => closeModal();
   }
 }
+window.closeModal = closeModal;
 
 async function handleModalSubmit(e) {
   e.preventDefault();
