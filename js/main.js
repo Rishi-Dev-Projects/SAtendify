@@ -202,8 +202,83 @@ function bindMobileEvents() {
 }
 
 // ==========================================
-// GLOBAL AUTOMATIC ABSENTEE REPORT MODAL
 // ==========================================
+// GLOBAL AUTOMATIC ABSENTEE REPORT & EXCEL EXPORT
+// ==========================================
+export function exportReportToExcel(report) {
+  if (!report) return;
+
+  const total = report.totalStudents || ((report.presentCount || 0) + (report.absentCount || 0) + (report.leaveCount || 0)) || 1;
+  const presentCount = report.presentCount || 0;
+  const absentCount = report.absentCount || 0;
+  const leaveCount = report.leaveCount || 0;
+  const presentPct = Math.round((presentCount / total) * 100);
+
+  const rows = [
+    ["SAtendify Academic Management System - Official Session Attendance Audit"],
+    ["Generated On:", report.generatedAt || new Date().toLocaleString()],
+    ["Date of Session:", report.date],
+    ["Period Slot:", `Period ${report.period}`],
+    ["Department Stream:", `${report.department || 'General'} Engineering`],
+    ["Class Details:", `Semester ${report.semester} (Division ${report.division})`],
+    ["Subject:", `${report.subjectCode || ''} - ${report.subjectName || ''}`],
+    ["Classroom / Lab Room:", report.room || 'N/A'],
+    ["Total Enrolled Roster:", total],
+    ["Present Students Count:", presentCount],
+    ["Absent Students Count:", absentCount],
+    ["Leave Students Count:", leaveCount],
+    ["Overall Presence Ratio:", `${presentPct}%`],
+    [""],
+    ["OFFICIAL ABSENTEE ROSTER"],
+    ["S.No.", "Roll Number", "Student Name", "Attendance Status", "Contact Number", "Email Address"]
+  ];
+
+  const absentList = report.absentStudents || [];
+  if (absentList.length === 0) {
+    rows.push(["-", "-", "100% Attendance Recorded - No Absentees", "PRESENT", "-", "-"]);
+  } else {
+    absentList.forEach((std, idx) => {
+      rows.push([
+        idx + 1,
+        `"${std.rollNumber || ''}"`,
+        `"${std.name || ''}"`,
+        "ABSENT",
+        `"${std.mobile || ''}"`,
+        `"${std.email || ''}"`
+      ]);
+    });
+  }
+
+  const fullList = report.fullRoster || [];
+  if (fullList.length > 0) {
+    rows.push([""]);
+    rows.push(["FULL CLASS ATTENDANCE REGISTRY LOG"]);
+    rows.push(["S.No.", "Roll Number", "Student Name", "Attendance Status", "Contact Number", "Email Address"]);
+    fullList.forEach((std, idx) => {
+      rows.push([
+        idx + 1,
+        `"${std.rollNumber || ''}"`,
+        `"${std.name || ''}"`,
+        (std.status || 'present').toUpperCase(),
+        `"${std.mobile || ''}"`,
+        `"${std.email || ''}"`
+      ]);
+    });
+  }
+
+  const csvContent = "\uFEFF" + rows.map(r => r.join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  const cleanSubject = (report.subjectCode || 'Session').replace(/[^a-zA-Z0-9_-]/g, '_');
+  link.setAttribute("download", `SAtendify_Absentee_Report_${cleanSubject}_${report.date}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+window.exportReportToExcel = exportReportToExcel;
+
 export function showAbsenteeReportModal(report) {
   if (!report) return;
 
@@ -217,6 +292,7 @@ export function showAbsenteeReportModal(report) {
   const leavePct = Math.round((leaveCount / total) * 100);
 
   const absentList = report.absentStudents || [];
+  const fullList = report.fullRoster || [];
 
   let absentRowsHTML = '';
   if (absentList.length === 0) {
@@ -232,57 +308,77 @@ export function showAbsenteeReportModal(report) {
     absentRowsHTML = absentList.map((std, idx) => `
       <tr>
         <td><span style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">${idx + 1}</span></td>
-        <td><span class="badge badge-warning" style="font-family:monospace; font-size:0.8rem; font-weight:700;">${std.rollNumber || 'N/A'}</span></td>
+        <td><span class="badge badge-danger" style="font-family:monospace; font-size:0.8rem; font-weight:700;">${std.rollNumber || 'N/A'}</span></td>
         <td><strong style="color:var(--text-primary);">${std.name}</strong></td>
         <td><span style="font-size:0.825rem; color:var(--text-secondary);">${std.mobile || std.email || 'N/A'}</span></td>
       </tr>
     `).join('');
   }
 
+  let fullRowsHTML = fullList.map((std, idx) => {
+    const isP = std.status === 'present';
+    const isA = std.status === 'absent';
+    const badgeClass = isP ? 'badge-success' : isA ? 'badge-danger' : 'badge-warning';
+    const label = isP ? '✓ PRESENT' : isA ? '❌ ABSENT' : '⏳ LEAVE';
+    return `
+      <tr>
+        <td><span style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">${idx + 1}</span></td>
+        <td><span class="badge" style="font-family:monospace; font-size:0.8rem; font-weight:700; background:var(--bg-secondary);">${std.rollNumber || 'N/A'}</span></td>
+        <td><strong style="color:var(--text-primary);">${std.name}</strong></td>
+        <td><span class="badge ${badgeClass}" style="font-size:0.725rem;">${label}</span></td>
+      </tr>
+    `;
+  }).join('');
+
   const modalHTML = `
     <div style="display: flex; flex-direction: column; gap: 16px;">
       
-      <!-- REPORT HEADER CARD -->
-      <div style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: #ffffff; border-radius: var(--radius-lg); padding: 20px; box-shadow: 0 4px 12px rgba(79,70,229,0.25);">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+      <!-- INSTITUTIONAL EXECUTIVE HEADER -->
+      <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: #ffffff; border-radius: var(--radius-lg); padding: 20px; box-shadow: 0 4px 14px rgba(30,27,75,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
           <div>
-            <span class="badge" style="background: rgba(255,255,255,0.2); color: #ffffff; font-size: 0.725rem; text-transform: uppercase; font-weight: 700; padding: 3px 8px; margin-bottom: 6px; display: inline-block;">Official Session Absentee Audit</span>
-            <h3 style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #ffffff;">${report.subjectName || 'Course Lecture'}</h3>
-            <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 2px;">Subject Code: <strong>${report.subjectCode || 'N/A'}</strong> &middot; Room: <strong>${report.room || 'N/A'}</strong></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span class="badge" style="background: rgba(255,255,255,0.2); color: #ffffff; font-size: 0.725rem; text-transform: uppercase; font-weight: 700; padding: 3px 8px;">Official Session Audit Report</span>
+              <span class="badge" style="background: rgba(99,102,241,0.3); color: #c7d2fe; font-size: 0.725rem; font-weight: 600; padding: 3px 8px;">${report.department || 'Engineering'} Stream</span>
+            </div>
+            <h3 style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #ffffff;">${report.subjectName || 'Course Session'}</h3>
+            <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 3px;">Course Code: <strong>${report.subjectCode || 'N/A'}</strong> &middot; Room: <strong>${report.room || 'N/A'}</strong></div>
           </div>
           <div style="text-align: right;">
-            <div style="font-size: 0.85rem; font-weight: 700; font-family: monospace; background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 6px;">${report.date}</div>
+            <div style="font-size: 0.85rem; font-weight: 700; font-family: monospace; background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 6px; display: inline-block;">${report.date}</div>
             <div style="font-size: 0.75rem; opacity: 0.85; margin-top: 4px;">Period ${report.period} &middot; Sem-${report.semester} (${report.division})</div>
           </div>
         </div>
       </div>
 
-      <!-- METRICS GRID -->
+      <!-- METRICS STATS BAR -->
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 12px 14px; text-align: center;">
-          <div style="font-size: 0.725rem; font-weight: 700; color: #166534; text-transform: uppercase;">Present Students</div>
-          <div style="font-size: 1.4rem; font-weight: 800; color: #15803d; margin-top: 2px;">${presentCount} <span style="font-size: 0.8rem; font-weight: 600; opacity: 0.8;">(${presentPct}%)</span></div>
+          <div style="font-size: 0.725rem; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.5px;">Present Students</div>
+          <div style="font-size: 1.4rem; font-weight: 800; color: #15803d; margin-top: 2px;">${presentCount} <span style="font-size: 0.8rem; font-weight: 600; opacity: 0.85;">(${presentPct}%)</span></div>
         </div>
         <div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-md); padding: 12px 14px; text-align: center;">
-          <div style="font-size: 0.725rem; font-weight: 700; color: #991b1b; text-transform: uppercase;">Absent Students</div>
-          <div style="font-size: 1.4rem; font-weight: 800; color: #dc2626; margin-top: 2px;">${absentCount} <span style="font-size: 0.8rem; font-weight: 600; opacity: 0.8;">(${absentPct}%)</span></div>
+          <div style="font-size: 0.725rem; font-weight: 700; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Absent Students</div>
+          <div style="font-size: 1.4rem; font-weight: 800; color: #dc2626; margin-top: 2px;">${absentCount} <span style="font-size: 0.8rem; font-weight: 600; opacity: 0.85;">(${absentPct}%)</span></div>
         </div>
         <div style="background: #fefce8; border: 1px solid #fde047; border-radius: var(--radius-md); padding: 12px 14px; text-align: center;">
-          <div style="font-size: 0.725rem; font-weight: 700; color: #854d0e; text-transform: uppercase;">On Approved Leave</div>
-          <div style="font-size: 1.4rem; font-weight: 800; color: #ca8a04; margin-top: 2px;">${leaveCount} <span style="font-size: 0.8rem; font-weight: 600; opacity: 0.8;">(${leavePct}%)</span></div>
+          <div style="font-size: 0.725rem; font-weight: 700; color: #854d0e; text-transform: uppercase; letter-spacing: 0.5px;">On Approved Leave</div>
+          <div style="font-size: 1.4rem; font-weight: 800; color: #ca8a04; margin-top: 2px;">${leaveCount} <span style="font-size: 0.8rem; font-weight: 600; opacity: 0.85;">(${leavePct}%)</span></div>
         </div>
       </div>
 
-      <!-- ABSENTEE ROSTER TABLE -->
-      <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden;">
-        <div style="padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-          <h4 style="margin: 0; font-size: 0.925rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-            Official Absentee List (${absentCount})
-          </h4>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">Generated: ${report.generatedAt || 'Today'}</span>
-        </div>
-        
+      <!-- TAB SELECTION -->
+      <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;">
+        <button type="button" class="btn btn-secondary report-tab-btn active" id="tab-absentee-view" style="font-weight: 700; font-size: 0.825rem; padding: 6px 14px; border-radius: var(--radius-sm);">
+          📋 Absentee Roster (${absentCount})
+        </button>
+        <button type="button" class="btn btn-secondary report-tab-btn" id="tab-fullroster-view" style="font-weight: 700; font-size: 0.825rem; padding: 6px 14px; border-radius: var(--radius-sm);">
+          📜 Full Class Registry (${total})
+        </button>
+      </div>
+
+      <!-- ROSTER TABLE CONTAINERS -->
+      <div id="pane-absentee-view" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden;">
         <div class="table-responsive" style="max-height: 240px; overflow-y: auto;">
           <table class="custom-table" style="margin: 0;">
             <thead>
@@ -290,7 +386,7 @@ export function showAbsenteeReportModal(report) {
                 <th style="width: 40px;">#</th>
                 <th>Roll Number</th>
                 <th>Student Name</th>
-                <th>Contact</th>
+                <th>Contact Details</th>
               </tr>
             </thead>
             <tbody>
@@ -300,27 +396,72 @@ export function showAbsenteeReportModal(report) {
         </div>
       </div>
 
+      <div id="pane-fullroster-view" style="display: none; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden;">
+        <div class="table-responsive" style="max-height: 240px; overflow-y: auto;">
+          <table class="custom-table" style="margin: 0;">
+            <thead>
+              <tr>
+                <th style="width: 40px;">#</th>
+                <th>Roll Number</th>
+                <th>Student Name</th>
+                <th>Attendance Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${fullRowsHTML}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   `;
 
-  if (window.openModal) {
-    window.openModal('Generated Session Absentee Report', modalHTML, null, {
-      maxWidth: '680px',
+  const openModalFn = window.openModal || (typeof openModal === 'function' ? openModal : null);
+  if (openModalFn) {
+    openModalFn('Official Session Absentee Audit Report', modalHTML, null, {
+      maxWidth: '720px',
       hideCancel: true,
       customFooter: `
         <button type="button" class="btn btn-secondary" id="btn-close-report-modal" style="font-weight: 600;">Close</button>
-        <button type="button" class="btn btn-primary" id="btn-print-report-modal" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-          Print / Download PDF
+        <button type="button" class="btn btn-secondary" id="btn-print-report-modal" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          Print Document
+        </button>
+        <button type="button" class="btn btn-primary" id="btn-excel-report-modal" style="background: #16a34a; border-color: #16a34a; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; box-shadow: 0 2px 6px rgba(22,163,74,0.3);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M10 9h4"></path></svg>
+          Download Excel Sheet (.xlsx / .csv)
         </button>
       `
     });
 
     setTimeout(() => {
       const printBtn = document.getElementById('btn-print-report-modal');
+      const excelBtn = document.getElementById('btn-excel-report-modal');
       const closeBtn = document.getElementById('btn-close-report-modal');
+      const tabAbsent = document.getElementById('tab-absentee-view');
+      const tabFull = document.getElementById('tab-fullroster-view');
+      const paneAbsent = document.getElementById('pane-absentee-view');
+      const paneFull = document.getElementById('pane-fullroster-view');
+
       if (closeBtn && window.closeModal) closeBtn.onclick = () => window.closeModal();
       if (printBtn) printBtn.onclick = () => window.print();
+      if (excelBtn) excelBtn.onclick = () => exportReportToExcel(report);
+
+      if (tabAbsent && tabFull && paneAbsent && paneFull) {
+        tabAbsent.onclick = () => {
+          tabAbsent.classList.add('active');
+          tabFull.classList.remove('active');
+          paneAbsent.style.display = 'block';
+          paneFull.style.display = 'none';
+        };
+        tabFull.onclick = () => {
+          tabFull.classList.add('active');
+          tabAbsent.classList.remove('active');
+          paneFull.style.display = 'block';
+          paneAbsent.style.display = 'none';
+        };
+      }
     }, 50);
   }
 }

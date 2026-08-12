@@ -314,40 +314,35 @@ def save_attendance():
         sub_snap = db.collection('subjects').document(sub_id).get()
         sub_info = sub_snap.to_dict() if sub_snap.exists else {"name": "Unknown", "code": ""}
 
-        # Compile absentee student details for automatic report generation
+        # Compile absentee and full class roster details for automatic report generation
         absent_students = []
         leave_students = []
+        full_roster = []
         present_count = 0
         absent_count = 0
         leave_count = 0
 
         for std_id, status in roster.items():
+            std_snap = db.collection('users').document(std_id).get()
+            sdata = std_snap.to_dict() if std_snap.exists else {}
+            student_item = {
+                "id": std_id,
+                "rollNumber": sdata.get('rollNumber', 'N/A'),
+                "name": sdata.get('name', 'Student'),
+                "email": sdata.get('email', 'N/A'),
+                "mobile": sdata.get('mobile') or sdata.get('phone') or 'N/A',
+                "status": status
+            }
+            full_roster.append(student_item)
+
             if status == 'present':
                 present_count += 1
             elif status == 'absent':
                 absent_count += 1
-                std_snap = db.collection('users').document(std_id).get()
-                if std_snap.exists:
-                    sdata = std_snap.to_dict()
-                    absent_students.append({
-                        "id": std_id,
-                        "rollNumber": sdata.get('rollNumber', 'N/A'),
-                        "name": sdata.get('name', 'Student'),
-                        "email": sdata.get('email', 'N/A'),
-                        "mobile": sdata.get('mobile') or sdata.get('phone') or 'N/A'
-                    })
+                absent_students.append(student_item)
             elif status == 'leave':
                 leave_count += 1
-                std_snap = db.collection('users').document(std_id).get()
-                if std_snap.exists:
-                    sdata = std_snap.to_dict()
-                    leave_students.append({
-                        "id": std_id,
-                        "rollNumber": sdata.get('rollNumber', 'N/A'),
-                        "name": sdata.get('name', 'Student'),
-                        "email": sdata.get('email', 'N/A'),
-                        "mobile": sdata.get('mobile') or sdata.get('phone') or 'N/A'
-                    })
+                leave_students.append(student_item)
 
         report_payload = {
             "attendanceId": att_id,
@@ -365,6 +360,7 @@ def save_attendance():
             "leaveCount": leave_count,
             "absentStudents": absent_students,
             "leaveStudents": leave_students,
+            "fullRoster": full_roster,
             "generatedAt": now_ist.strftime("%Y-%m-%d %H:%M:%S IST")
         }
 
@@ -399,6 +395,7 @@ def get_attendance_report(att_id):
         records = att_data.get('records', [])
         absent_students = []
         leave_students = []
+        full_roster = []
         present_count = 0
         absent_count = 0
         leave_count = 0
@@ -406,24 +403,26 @@ def get_attendance_report(att_id):
         for r in records:
             std_id = r.get('studentId')
             status = r.get('status')
+            std_snap = db.collection('users').document(std_id).get()
+            sdata = std_snap.to_dict() if std_snap.exists else {}
+            student_item = {
+                "id": std_id,
+                "rollNumber": sdata.get('rollNumber', 'N/A'),
+                "name": sdata.get('name', 'Student'),
+                "email": sdata.get('email', 'N/A'),
+                "mobile": sdata.get('mobile') or sdata.get('phone') or 'N/A',
+                "status": status
+            }
+            full_roster.append(student_item)
+
             if status == 'present':
                 present_count += 1
-            elif status in ['absent', 'leave']:
-                std_snap = db.collection('users').document(std_id).get()
-                sdata = std_snap.to_dict() if std_snap.exists else {}
-                student_item = {
-                    "id": std_id,
-                    "rollNumber": sdata.get('rollNumber', 'N/A'),
-                    "name": sdata.get('name', 'Student'),
-                    "email": sdata.get('email', 'N/A'),
-                    "mobile": sdata.get('mobile') or sdata.get('phone') or 'N/A'
-                }
-                if status == 'absent':
-                    absent_count += 1
-                    absent_students.append(student_item)
-                else:
-                    leave_count += 1
-                    leave_students.append(student_item)
+            elif status == 'absent':
+                absent_count += 1
+                absent_students.append(student_item)
+            elif status == 'leave':
+                leave_count += 1
+                leave_students.append(student_item)
 
         report = {
             "attendanceId": att_id,
@@ -441,6 +440,7 @@ def get_attendance_report(att_id):
             "leaveCount": leave_count,
             "absentStudents": absent_students,
             "leaveStudents": leave_students,
+            "fullRoster": full_roster,
             "generatedAt": get_ist_now().strftime("%Y-%m-%d %H:%M:%S IST")
         }
 
