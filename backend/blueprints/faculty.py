@@ -309,10 +309,145 @@ def save_attendance():
             payload["lastEditedAt"] = firestore.SERVER_TIMESTAMP
             
         att_ref.set(payload, merge=True)
-        return jsonify({"success": True, "message": "Attendance record filed successfully."}), 201
+
+        # Fetch subject details for report header
+        sub_snap = db.collection('subjects').document(sub_id).get()
+        sub_info = sub_snap.to_dict() if sub_snap.exists else {"name": "Unknown", "code": ""}
+
+        # Compile absentee student details for automatic report generation
+        absent_students = []
+        leave_students = []
+        present_count = 0
+        absent_count = 0
+        leave_count = 0
+
+        for std_id, status in roster.items():
+            if status == 'present':
+                present_count += 1
+            elif status == 'absent':
+                absent_count += 1
+                std_snap = db.collection('users').document(std_id).get()
+                if std_snap.exists:
+                    sdata = std_snap.to_dict()
+                    absent_students.append({
+                        "id": std_id,
+                        "rollNumber": sdata.get('rollNumber', 'N/A'),
+                        "name": sdata.get('name', 'Student'),
+                        "email": sdata.get('email', 'N/A'),
+                        "mobile": sdata.get('mobile') or sdata.get('phone') or 'N/A'
+                    })
+            elif status == 'leave':
+                leave_count += 1
+                std_snap = db.collection('users').document(std_id).get()
+                if std_snap.exists:
+                    sdata = std_snap.to_dict()
+                    leave_students.append({
+                        "id": std_id,
+                        "rollNumber": sdata.get('rollNumber', 'N/A'),
+                        "name": sdata.get('name', 'Student'),
+                        "email": sdata.get('email', 'N/A'),
+                        "mobile": sdata.get('mobile') or sdata.get('phone') or 'N/A'
+                    })
+
+        report_payload = {
+            "attendanceId": att_id,
+            "date": date_str,
+            "period": period,
+            "room": tt_data.get('room', 'N/A'),
+            "department": dept,
+            "semester": sem,
+            "division": div,
+            "subjectCode": sub_info.get('code'),
+            "subjectName": sub_info.get('name'),
+            "totalStudents": len(roster),
+            "presentCount": present_count,
+            "absentCount": absent_count,
+            "leaveCount": leave_count,
+            "absentStudents": absent_students,
+            "leaveStudents": leave_students,
+            "generatedAt": now_ist.strftime("%Y-%m-%d %H:%M:%S IST")
+        }
+
+        return jsonify({
+            "success": True,
+            "message": "Attendance record filed successfully.",
+            "report": report_payload
+        }), 201
         
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@faculty_bp.route('/attendance-report/<att_id>', methods=['GET'])
+@require_auth(['faculty', 'hod', 'admin'])
+def get_attendance_report(att_id):
+    try:
+        att_ref = db.collection('attendance').document(att_id)
+        att_snap = att_ref.get()
+        if not att_snap.exists:
+            return jsonify({"success": False, "error": "Attendance record not found"}), 404
+
+        att_data = att_snap.to_dict()
+        sub_id = att_data.get('subjectId')
+        sub_snap = db.collection('subjects').document(sub_id).get()
+        sub_info = sub_snap.to_dict() if sub_snap.exists else {"name": "Unknown", "code": ""}
+
+        tt_id = att_data.get('timetableId')
+        tt_snap = db.collection('timetables').document(tt_id).get() if tt_id else None
+        tt_data = tt_snap.to_dict() if tt_snap and tt_snap.exists else {}
+
+        records = att_data.get('records', [])
+        absent_students = []
+        leave_students = []
+        present_count = 0
+        absent_count = 0
+        leave_count = 0
+
+        for r in records:
+            std_id = r.get('studentId')
+            status = r.get('status')
+            if status == 'present':
+                present_count += 1
+            elif status in ['absent', 'leave']:
+                std_snap = db.collection('users').document(std_id).get()
+                sdata = std_snap.to_dict() if std_snap.exists else {}
+                student_item = {
+                    "id": std_id,
+                    "rollNumber": sdata.get('rollNumber', 'N/A'),
+                    "name": sdata.get('name', 'Student'),
+                    "email": sdata.get('email', 'N/A'),
+                    "mobile": sdata.get('mobile') or sdata.get('phone') or 'N/A'
+                }
+                if status == 'absent':
+                    absent_count += 1
+                    absent_students.append(student_item)
+                else:
+                    leave_count += 1
+                    leave_students.append(student_item)
+
+        report = {
+            "attendanceId": att_id,
+            "date": att_data.get('date'),
+            "period": att_data.get('period'),
+            "room": tt_data.get('room', 'N/A'),
+            "department": att_data.get('department'),
+            "semester": att_data.get('semester'),
+            "division": att_data.get('division'),
+            "subjectCode": sub_info.get('code'),
+            "subjectName": sub_info.get('name'),
+            "totalStudents": len(records),
+            "presentCount": present_count,
+            "absentCount": absent_count,
+            "leaveCount": leave_count,
+            "absentStudents": absent_students,
+            "leaveStudents": leave_students,
+            "generatedAt": get_ist_now().strftime("%Y-%m-%d %H:%M:%S IST")
+        }
+
+        return jsonify({"success": True, "data": report}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 # ==========================================
 # 4. ATTENDANCE HISTORY
