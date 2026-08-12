@@ -30,7 +30,7 @@ def get_faculty_today_timetable():
         # Batch pre-fetch subjects map, today's attendance logs, and active proxies
         subs_dict = {doc.id: doc.to_dict() for doc in db.collection('subjects').stream()}
         atts_today_set = set(doc.id for doc in db.collection('attendance').where('date', '==', today_date_str).stream())
-        proxies_today_list = [p.to_dict() for p in db.collection('proxy_assignments').where('date', '==', today_date_str).where('status', '==', 'active').stream()]
+        proxies_today_list = [p.to_dict() for p in db.collection('proxy_assignments').where('date', '==', today_date_str).where('status', 'in', ['active', 'approved']).stream()]
 
         results = []
         for doc in slots_snap:
@@ -55,7 +55,8 @@ def get_faculty_today_timetable():
                 proxy_info = {
                     "proxyFacultyId": p_match.get('proxyFacultyId'),
                     "proxyFacultyName": p_match.get('proxyFacultyName'),
-                    "reason": p_match.get('reason')
+                    "reason": p_match.get('reason'),
+                    "status": p_match.get('status', 'active')
                 }
             
             results.append({
@@ -82,7 +83,7 @@ def get_faculty_today_timetable():
         assigned_proxies = db.collection('proxy_assignments')\
                              .where('proxyFacultyId', '==', uid)\
                              .where('date', '==', today_date_str)\
-                             .where('status', '==', 'active').get()
+                             .where('status', 'in', ['active', 'approved']).get()
                              
         for pdoc in assigned_proxies:
             pdata = pdoc.to_dict()
@@ -501,7 +502,7 @@ def create_proxy_assignment():
             "room": tt_data.get('room'),
             "day": tt_data.get('day'),
             "reason": reason,
-            "status": "active",
+            "status": "active" if current_role in ['hod', 'admin'] else "pending",
             "createdBy": current_uid,
             "createdAt": firestore.SERVER_TIMESTAMP
         }
@@ -554,6 +555,39 @@ def get_proxy_assignments():
 
         proxies.sort(key=lambda p: p.get('date', ''), reverse=True)
         return jsonify({"success": True, "data": proxies}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@faculty_bp.route('/proxy-assignments/<id>/status', methods=['PUT'])
+@require_auth(['hod', 'admin'])
+def update_proxy_status(id):
+    try:
+        data = request.get_json() or {}
+        new_status = data.get('status')
+        if new_status not in ['active', 'approved', 'rejected']:
+            return jsonify({"success": False, "error": "Invalid status. Must be 'approved' or 'rejected'."}), 400
+
+        doc_ref = db.collection('proxy_assignments').document(id)
+        snap = doc_ref.get()
+        if not snap.exists:
+            return jsonify({"success": False, "error": "Proxy record not found"}), 404
+
+        proxy_data = snap.to_dict()
+        current_role = g.current_user.get('role')
+        user_dept = g.current_user.get('department')
+
+        if current_role == 'hod' and proxy_data.get('department') != user_dept:
+            return jsonify({"success": False, "error": "Forbidden: Cannot update proxy outside your department."}), 403
+
+        status_to_save = 'active' if new_status in ['active', 'approved'] else 'rejected'
+        doc_ref.update({
+            "status": status_to_save,
+            "approvedBy": g.current_user.get('uid'),
+            "updatedAt": firestore.SERVER_TIMESTAMP
+        })
+
+        return jsonify({"success": True, "message": f"Proxy assignment status updated to {status_to_save}."}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

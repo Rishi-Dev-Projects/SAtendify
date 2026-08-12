@@ -1247,6 +1247,14 @@ async function renderProxyTab() {
         `<span class="badge badge-info" style="font-size:0.7rem;">Delegated Out</span>` :
         `<span class="badge badge-warning" style="font-size:0.7rem;">Assigned to You</span>`;
 
+      const isPending = p.status === 'pending';
+      const isApproved = p.status === 'active' || p.status === 'approved';
+      const isRejected = p.status === 'rejected';
+
+      let statusBadge = `<span class="badge badge-warning">⏳ Pending HOD</span>`;
+      if (isApproved) statusBadge = `<span class="badge badge-success">✓ Approved</span>`;
+      if (isRejected) statusBadge = `<span class="badge badge-danger">❌ Rejected</span>`;
+
       return `
         <tr>
           <td><span style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">${idx + 1}</span></td>
@@ -1256,7 +1264,7 @@ async function renderProxyTab() {
           <td>${p.originalFacultyName}</td>
           <td><strong>${p.proxyFacultyName}</strong></td>
           <td><span style="font-size:0.825rem; color:var(--text-secondary);">${p.reason || 'Leave'}</span></td>
-          <td><span class="badge badge-success">Active</span></td>
+          <td>${statusBadge}</td>
           <td style="text-align: right;">
             ${isOutgoing ? `
               <button class="btn btn-danger btn-cancel-proxy" data-id="${p.id}" style="padding:5px 10px; font-size:0.775rem;">

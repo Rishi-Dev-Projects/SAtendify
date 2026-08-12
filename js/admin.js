@@ -77,6 +77,9 @@ async function initAdminDashboard(forcedTab = null) {
     case 'faculty':
       await renderFacultyTab();
       break;
+    case 'proxies':
+      await renderProxyTab();
+      break;
     case 'students':
       await renderStudentsTab();
       break;
@@ -99,6 +102,7 @@ function getPageTitleForTab(tab) {
     case 'overview': return 'Dashboard';
     case 'departments': return 'Subjects';
     case 'faculty': return 'Faculty';
+    case 'proxies': return 'Proxy Allocations';
     case 'students': return 'Students';
     case 'users': return 'Academic Registers';
     case 'timetable': return 'Timetable';
@@ -2170,5 +2174,310 @@ async function openRosterEditModal(log, timetableId) {
       sel.querySelectorAll('.presence-btn').forEach(b => b.classList.remove('active'));
       sel.querySelector('.p-absent').classList.add('active');
     });
+  });
+}
+
+// ==========================================
+// PROXY ALLOCATIONS AUDIT & APPROVAL TAB (ADMIN)
+// ==========================================
+async function renderProxyTab() {
+  const container = document.getElementById('dashboard-content');
+  container.innerHTML = `<div class="skeleton-bar" style="width: 100%; height: 280px;"></div>`;
+
+  const [proxiesRes, ttRes, usersRes] = await Promise.all([
+    apiFetch('/faculty/proxy-assignments'),
+    apiFetch('/admin/timetable'),
+    apiFetch('/admin/users')
+  ]);
+
+  if (!proxiesRes.success) return;
+
+  const proxies = proxiesRes.data;
+  const allTimetable = ttRes.data || [];
+  const staff = (usersRes.data || []).filter(u => u.role === 'faculty' || u.role === 'hod');
+
+  container.innerHTML = `
+    <!-- Top Executive Banner -->
+    <div class="admin-welcome-banner" style="margin-bottom: 20px;">
+      <div>
+        <h2 class="admin-welcome-title">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#6366f1;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          <span>System-Wide Proxy & Substitute Allocations</span>
+        </h2>
+        <p class="admin-welcome-subtitle">Review, approve, or allocate proxy substitute professors across all academic departments.</p>
+      </div>
+      <div class="admin-banner-actions">
+        <button class="btn btn-primary" id="btn-create-proxy-admin" style="display:inline-flex; align-items:center; gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+          + Assign Substitute Proxy
+        </button>
+      </div>
+    </div>
+
+    <!-- Proxy Assignments Table -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent);"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <h3 style="margin:0;">Proxy Approval & Allocation Register</h3>
+        </div>
+        <span class="stat-desc">Institutional Master Audit</span>
+      </div>
+      <div class="table-responsive">
+        <table class="custom-table" id="proxy-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">#</th>
+              <th>Date</th>
+              <th>Department</th>
+              <th>Period & Class</th>
+              <th>Subject</th>
+              <th>Original Professor</th>
+              <th>Proxy Substitute</th>
+              <th>Reason</th>
+              <th>Status</th>
+              <th style="text-align: right;">Operations</th>
+            </tr>
+          </thead>
+          <tbody id="proxy-table-rows">
+            <!-- Filtered rows -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const rowsEl = document.getElementById('proxy-table-rows');
+  if (proxies.length === 0) {
+    rowsEl.innerHTML = `
+      <tr>
+        <td colspan="10">
+          <div class="empty-placeholder-box">
+            <div class="empty-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            </div>
+            <p>No proxy lecture allocations registered in the system.</p>
+          </div>
+        </td>
+      </tr>
+    `;
+  } else {
+    rowsEl.innerHTML = proxies.map((p, idx) => {
+      const isPending = p.status === 'pending';
+      const isApproved = p.status === 'active' || p.status === 'approved';
+      const isRejected = p.status === 'rejected';
+
+      let statusBadge = `<span class="badge badge-warning">⏳ Pending Approval</span>`;
+      if (isApproved) statusBadge = `<span class="badge badge-success">✓ Approved</span>`;
+      if (isRejected) statusBadge = `<span class="badge badge-danger">❌ Rejected</span>`;
+
+      let opsHTML = '';
+      if (isPending) {
+        opsHTML = `
+          <button class="btn btn-success btn-approve-proxy" data-id="${p.id}" style="padding:4px 8px; font-size:0.75rem; margin-right:4px;">Approve</button>
+          <button class="btn btn-danger btn-reject-proxy" data-id="${p.id}" style="padding:4px 8px; font-size:0.75rem;">Reject</button>
+        `;
+      } else {
+        opsHTML = `
+          <button class="btn btn-secondary btn-cancel-proxy" data-id="${p.id}" style="padding:4px 8px; font-size:0.75rem;">
+            ${isRejected ? 'Delete Log' : 'Revoke'}
+          </button>
+        `;
+      }
+
+      return `
+        <tr>
+          <td><span style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">${idx + 1}</span></td>
+          <td><strong style="font-family:monospace; font-size:0.85rem;">${p.date}</strong></td>
+          <td><span class="badge" style="background:var(--bg-secondary); font-weight:600; font-size:0.75rem;">${p.department || 'GEN'}</span></td>
+          <td><span class="badge badge-primary">P${p.period}</span> <span style="font-size:0.8rem; color:var(--text-secondary);">Sem-${p.semester} (${p.division})</span></td>
+          <td><strong>${p.subjectCode}</strong> <span style="font-size:0.8rem; color:var(--text-secondary);">&middot; ${p.subjectName}</span></td>
+          <td>${p.originalFacultyName}</td>
+          <td><strong>${p.proxyFacultyName}</strong></td>
+          <td><span style="font-size:0.825rem; color:var(--text-secondary);">${p.reason || 'Leave'}</span></td>
+          <td>${statusBadge}</td>
+          <td style="text-align: right;">${opsHTML}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Bind table action buttons (Approve, Reject, Revoke)
+  rowsEl.addEventListener('click', async (e) => {
+    const approveBtn = e.target.closest('.btn-approve-proxy');
+    const rejectBtn = e.target.closest('.btn-reject-proxy');
+    const cancelBtn = e.target.closest('.btn-cancel-proxy');
+
+    if (approveBtn) {
+      const pId = approveBtn.dataset.id;
+      const res = await apiFetch(`/faculty/proxy-assignments/${pId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'approved' })
+      });
+      if (res.success) {
+        showToast('Proxy request approved by Admin!', 'success');
+        await renderProxyTab();
+      }
+      return;
+    }
+
+    if (rejectBtn) {
+      const pId = rejectBtn.dataset.id;
+      const res = await apiFetch(`/faculty/proxy-assignments/${pId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'rejected' })
+      });
+      if (res.success) {
+        showToast('Proxy request rejected.', 'info');
+        await renderProxyTab();
+      }
+      return;
+    }
+
+    if (cancelBtn) {
+      const pId = cancelBtn.dataset.id;
+      if (confirm('Revoke or delete this proxy substitute record?')) {
+        const res = await apiFetch(`/faculty/proxy-assignments/${pId}`, { method: 'DELETE' });
+        if (res.success) {
+          showToast('Proxy assignment record deleted', 'success');
+          await renderProxyTab();
+        }
+      }
+    }
+  });
+
+  // Bind Admin create proxy button
+  document.getElementById('btn-create-proxy-admin').addEventListener('click', async () => {
+    if (allTimetable.length === 0) {
+      showToast('No timetable slots configured in system.', 'error');
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const contentHTML = `
+      <div class="form-group">
+        <label for="proxy-admin-slot">Select Master Timetable Lecture / Lab Slot</label>
+        <select class="form-control" name="timetableId" id="proxy-admin-slot" required>
+          ${allTimetable.map(s => {
+            const fac = staff.find(f => String(f.id) === String(s.facultyId));
+            return `<option value="${s.id}">[${s.department}] ${s.day} P${s.period} &middot; Sem-${s.semester} (${s.division}) &middot; ${s.room || 'Room'} &middot; ${fac ? fac.name : 'Faculty'}</option>`;
+          }).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="proxy-admin-date">Target Absence Date</label>
+        <input type="date" class="form-control" name="date" id="proxy-admin-date" value="${todayStr}" required>
+      </div>
+      <div class="form-group">
+        <label for="proxy-admin-fac">Assign Available Substitute Professor (Proxy)</label>
+        <select class="form-control" name="proxyFacultyId" id="proxy-admin-fac" required>
+          <!-- Populated dynamically via slot & date availability filter -->
+        </select>
+        <div id="proxy-admin-availability-notice" style="margin-top: 6px;"></div>
+      </div>
+      <div class="form-group">
+        <label for="proxy-admin-reason">Reason for Leave Coverage</label>
+        <input type="text" class="form-control" name="reason" id="proxy-admin-reason" placeholder="e.g. Executive Directive / Leave Coverage" required>
+      </div>
+    `;
+
+    openModal('Assign Substitute Proxy (Admin Privilege)', contentHTML, async (formData) => {
+      const proxyFacId = formData.get('proxyFacultyId');
+      if (!proxyFacId) {
+        showToast('Please select an available substitute professor.', 'error');
+        return false;
+      }
+
+      const payload = {
+        timetableId: formData.get('timetableId'),
+        date: formData.get('date'),
+        proxyFacultyId: proxyFacId,
+        reason: formData.get('reason')
+      };
+
+      const res = await apiFetch('/faculty/proxy-assignments', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      if (res.success) {
+        showToast('Substitute proxy assigned & approved by Admin!', 'success');
+        await renderProxyTab();
+        return true;
+      }
+      return false;
+    });
+
+    const slotSelect = document.getElementById('proxy-admin-slot');
+    const dateInput = document.getElementById('proxy-admin-date');
+    const facSelect = document.getElementById('proxy-admin-fac');
+    const noticeEl = document.getElementById('proxy-admin-availability-notice');
+
+    function updateAdminAvailableFaculty() {
+      const slotId = slotSelect.value;
+      const dateStr = dateInput.value;
+      if (!slotId || !dateStr) return;
+
+      const slot = allTimetable.find(s => String(s.id) === String(slotId));
+      if (!slot) return;
+
+      const dateObj = new Date(dateStr + 'T00:00:00');
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dateDay = daysOfWeek[dateObj.getDay()];
+
+      const targetPeriod = parseInt(slot.period);
+      const targetDuration = slot.duration || 1;
+      const targetRoom = (slot.room || '').toLowerCase().trim();
+      const origFacultyId = slot.facultyId;
+
+      // Filter staff within same department as slot
+      const deptStaff = staff.filter(f => f.department === slot.department);
+      const availableList = [];
+
+      deptStaff.forEach(f => {
+        if (String(f.id) === String(origFacultyId)) return;
+
+        const overlapping = allTimetable.filter(c => {
+          if (String(c.facultyId) !== String(f.id)) return false;
+          if (c.day !== dateDay) return false;
+          const cPeriod = parseInt(c.period);
+          const cDuration = c.duration || 1;
+          return (cPeriod < targetPeriod + targetDuration) && (cPeriod + cDuration > targetPeriod);
+        });
+
+        if (overlapping.length === 0) {
+          availableList.push({
+            fac: f,
+            label: `✓ ${f.name} (Available - Free Slot)`
+          });
+        } else {
+          const sameRoom = overlapping.every(c => (c.room || '').toLowerCase().trim() === targetRoom);
+          if (sameRoom) {
+            availableList.push({
+              fac: f,
+              label: `✓ ${f.name} (Co-located - Same Room: ${slot.room})`
+            });
+          }
+        }
+      });
+
+      if (availableList.length > 0) {
+        facSelect.innerHTML = availableList.map(item => `<option value="${item.fac.id}">${item.label}</option>`).join('');
+        if (noticeEl) {
+          noticeEl.innerHTML = `<span style="color: #166534; font-size: 0.78rem; font-weight: 600; background: #dcfce7; padding: 4px 8px; border-radius: 4px; display: inline-block;">✓ Found ${availableList.length} available professor(s) for ${dateDay} Period ${targetPeriod} (${slot.room}).</span>`;
+        }
+      } else {
+        facSelect.innerHTML = `<option value="" disabled selected>No faculty available (all busy in different rooms)</option>`;
+        if (noticeEl) {
+          noticeEl.innerHTML = `<span style="color: #dc2626; font-size: 0.78rem; font-weight: 600; background: #fee2e2; padding: 4px 8px; border-radius: 4px; display: inline-block;">⚠️ All department professors are teaching elsewhere on ${dateDay} Period ${targetPeriod}.</span>`;
+        }
+      }
+    }
+
+    slotSelect.addEventListener('change', updateAdminAvailableFaculty);
+    dateInput.addEventListener('input', updateAdminAvailableFaculty);
+    dateInput.addEventListener('change', updateAdminAvailableFaculty);
+    updateAdminAvailableFaculty();
   });
 }

@@ -33,6 +33,7 @@ function renderSidebar(user, activeTab) {
       <li class="nav-item ${activeTab === 'overview' ? 'active' : ''}"><a href="admin.html?tab=overview">Dashboard</a></li>
       <li class="nav-item ${activeTab === 'departments' ? 'active' : ''}"><a href="admin.html?tab=departments">Subjects</a></li>
       <li class="nav-item ${activeTab === 'faculty' ? 'active' : ''}"><a href="admin.html?tab=faculty">Faculty</a></li>
+      <li class="nav-item ${activeTab === 'proxies' ? 'active' : ''}"><a href="admin.html?tab=proxies">Proxy Allocations</a></li>
       <li class="nav-item ${activeTab === 'students' ? 'active' : ''}"><a href="admin.html?tab=students">Students</a></li>
       <li class="nav-item ${activeTab === 'timetable' ? 'active' : ''}"><a href="admin.html?tab=timetable">Timetable</a></li>
       <li class="nav-item ${activeTab === 'attendance' ? 'active' : ''}"><a href="admin.html?tab=attendance">Attendance Logs</a></li>

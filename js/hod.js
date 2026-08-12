@@ -2129,6 +2129,28 @@ async function renderProxyTab() {
     `;
   } else {
     rowsEl.innerHTML = proxies.map((p, idx) => {
+      const isPending = p.status === 'pending';
+      const isApproved = p.status === 'active' || p.status === 'approved';
+      const isRejected = p.status === 'rejected';
+
+      let statusBadge = `<span class="badge badge-warning">⏳ Pending Approval</span>`;
+      if (isApproved) statusBadge = `<span class="badge badge-success">✓ Approved</span>`;
+      if (isRejected) statusBadge = `<span class="badge badge-danger">❌ Rejected</span>`;
+
+      let opsHTML = '';
+      if (isPending) {
+        opsHTML = `
+          <button class="btn btn-success btn-approve-proxy" data-id="${p.id}" style="padding:4px 8px; font-size:0.75rem; margin-right:4px;">Approve</button>
+          <button class="btn btn-danger btn-reject-proxy" data-id="${p.id}" style="padding:4px 8px; font-size:0.75rem;">Reject</button>
+        `;
+      } else {
+        opsHTML = `
+          <button class="btn btn-secondary btn-cancel-proxy" data-id="${p.id}" style="padding:4px 8px; font-size:0.75rem;">
+            ${isRejected ? 'Delete Log' : 'Revoke'}
+          </button>
+        `;
+      }
+
       return `
         <tr>
           <td><span style="font-weight:700; color:var(--text-muted); font-size:0.8rem;">${idx + 1}</span></td>
@@ -2138,27 +2160,53 @@ async function renderProxyTab() {
           <td>${p.originalFacultyName}</td>
           <td><strong>${p.proxyFacultyName}</strong></td>
           <td><span style="font-size:0.825rem; color:var(--text-secondary);">${p.reason || 'Leave'}</span></td>
-          <td><span class="badge badge-success">Active</span></td>
-          <td style="text-align: right;">
-            <button class="btn btn-danger btn-cancel-proxy" data-id="${p.id}" style="padding:5px 10px; font-size:0.775rem;">
-              Revoke Proxy
-            </button>
-          </td>
+          <td>${statusBadge}</td>
+          <td style="text-align: right;">${opsHTML}</td>
         </tr>
       `;
     }).join('');
   }
 
-  // Bind revoke button
+  // Bind table action buttons (Approve, Reject, Revoke)
   rowsEl.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.btn-cancel-proxy');
-    if (!btn) return;
-    const pId = btn.dataset.id;
-    if (confirm('Revoke this proxy substitute assignment?')) {
-      const res = await apiFetch(`/faculty/proxy-assignments/${pId}`, { method: 'DELETE' });
+    const approveBtn = e.target.closest('.btn-approve-proxy');
+    const rejectBtn = e.target.closest('.btn-reject-proxy');
+    const cancelBtn = e.target.closest('.btn-cancel-proxy');
+
+    if (approveBtn) {
+      const pId = approveBtn.dataset.id;
+      const res = await apiFetch(`/faculty/proxy-assignments/${pId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'approved' })
+      });
       if (res.success) {
-        showToast('Proxy assignment revoked', 'success');
+        showToast('Substitute proxy request approved by HOD!', 'success');
         await renderProxyTab();
+      }
+      return;
+    }
+
+    if (rejectBtn) {
+      const pId = rejectBtn.dataset.id;
+      const res = await apiFetch(`/faculty/proxy-assignments/${pId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'rejected' })
+      });
+      if (res.success) {
+        showToast('Substitute proxy request rejected.', 'info');
+        await renderProxyTab();
+      }
+      return;
+    }
+
+    if (cancelBtn) {
+      const pId = cancelBtn.dataset.id;
+      if (confirm('Revoke or remove this proxy substitute record?')) {
+        const res = await apiFetch(`/faculty/proxy-assignments/${pId}`, { method: 'DELETE' });
+        if (res.success) {
+          showToast('Proxy assignment record removed', 'success');
+          await renderProxyTab();
+        }
       }
     }
   });
