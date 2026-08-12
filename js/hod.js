@@ -2178,11 +2178,11 @@ async function renderProxyTab() {
 
     const contentHTML = `
       <div class="form-group">
-        <label for="proxy-hod-slot">Select Department Lecture Slot</label>
+        <label for="proxy-hod-slot">Select Department Lecture / Lab Slot</label>
         <select class="form-control" name="timetableId" id="proxy-hod-slot" required>
           ${deptTimetable.map(s => {
-            const fac = staff.find(f => f.id === s.facultyId);
-            return `<option value="${s.id}">${s.day} P${s.period} &middot; Sem-${s.semester} (${s.division}) &middot; ${fac ? fac.name : 'Faculty'}</option>`;
+            const fac = staff.find(f => String(f.id) === String(s.facultyId));
+            return `<option value="${s.id}">${s.day} P${s.period} &middot; Sem-${s.semester} (${s.division}) &middot; ${s.room || 'Room'} &middot; ${fac ? fac.name : 'Faculty'}</option>`;
           }).join('')}
         </select>
       </div>
@@ -2193,8 +2193,9 @@ async function renderProxyTab() {
       <div class="form-group">
         <label for="proxy-hod-fac">Assign Substitute Professor (Proxy)</label>
         <select class="form-control" name="proxyFacultyId" id="proxy-hod-fac" required>
-          ${staff.map(f => `<option value="${f.id}">${f.name} (${f.role.toUpperCase()})</option>`).join('')}
+          <!-- Populated dynamically via slot & date availability filter -->
         </select>
+        <div id="proxy-availability-notice" style="margin-top: 6px;"></div>
       </div>
       <div class="form-group">
         <label for="proxy-hod-reason">Reason for Leave Coverage</label>
@@ -2203,10 +2204,16 @@ async function renderProxyTab() {
     `;
 
     openModal('Assign Department Substitute Proxy', contentHTML, async (formData) => {
+      const proxyFacId = formData.get('proxyFacultyId');
+      if (!proxyFacId) {
+        showToast('Please select an available substitute professor.', 'error');
+        return false;
+      }
+
       const payload = {
         timetableId: formData.get('timetableId'),
         date: formData.get('date'),
-        proxyFacultyId: formData.get('proxyFacultyId'),
+        proxyFacultyId: proxyFacId,
         reason: formData.get('reason')
       };
 
@@ -2222,5 +2229,81 @@ async function renderProxyTab() {
       }
       return false;
     });
+
+    // Helper to calculate & filter available faculty for selected slot and date
+    function updateAvailableFaculty() {
+      const slotId = document.getElementById('proxy-hod-slot').value;
+      const dateStr = document.getElementById('proxy-hod-date').value;
+      const facSelect = document.getElementById('proxy-hod-fac');
+      const availabilityNotice = document.getElementById('proxy-availability-notice');
+
+      if (!slotId || !dateStr || !facSelect) return;
+
+      const slot = deptTimetable.find(s => String(s.id) === String(slotId));
+      if (!slot) return;
+
+      // Calculate Day of Week from dateStr (e.g. "Monday")
+      const dateObj = new Date(dateStr + 'T00:00:00');
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dateDay = daysOfWeek[dateObj.getDay()];
+
+      const targetPeriod = parseInt(slot.period);
+      const targetDuration = slot.duration || 1;
+      const targetRoom = (slot.room || '').toLowerCase().trim();
+      const origFacultyId = slot.facultyId;
+
+      const availableList = [];
+
+      staff.forEach(f => {
+        if (String(f.id) === String(origFacultyId)) return; // Exclude original assigned professor
+
+        // Find overlapping classes for this faculty member on dateDay
+        const overlapping = (ttRes.data || []).filter(c => {
+          if (String(c.facultyId) !== String(f.id)) return false;
+          if (c.day !== dateDay) return false;
+          const cPeriod = parseInt(c.period);
+          const cDuration = c.duration || 1;
+          return (cPeriod < targetPeriod + targetDuration) && (cPeriod + cDuration > targetPeriod);
+        });
+
+        if (overlapping.length === 0) {
+          availableList.push({
+            fac: f,
+            type: 'AVAILABLE',
+            label: `✓ ${f.name} (Available - No Class scheduled)`
+          });
+        } else {
+          // Check if all overlapping classes are in the EXACT SAME location/room
+          const sameRoom = overlapping.every(c => (c.room || '').toLowerCase().trim() === targetRoom);
+          if (sameRoom) {
+            availableList.push({
+              fac: f,
+              type: 'SAME_LOCATION',
+              label: `✓ ${f.name} (Co-located - Same Room: ${slot.room})`
+            });
+          }
+        }
+      });
+
+      if (availableList.length > 0) {
+        facSelect.innerHTML = availableList.map(item => `<option value="${item.fac.id}">${item.label}</option>`).join('');
+        if (availabilityNotice) {
+          availabilityNotice.innerHTML = `<span style="color: #166534; font-size: 0.78rem; font-weight: 600; background: #dcfce7; padding: 4px 8px; border-radius: 4px; display: inline-block;">✓ Found ${availableList.length} available substitute professor(s) for ${dateDay} Period ${targetPeriod} (${slot.room}).</span>`;
+        }
+      } else {
+        facSelect.innerHTML = `<option value="" disabled selected>No faculty available (all busy in different rooms)</option>`;
+        if (availabilityNotice) {
+          availabilityNotice.innerHTML = `<span style="color: #dc2626; font-size: 0.78rem; font-weight: 600; background: #fee2e2; padding: 4px 8px; border-radius: 4px; display: inline-block;">⚠️ All department professors are teaching elsewhere on ${dateDay} Period ${targetPeriod}.</span>`;
+        }
+      }
+    }
+
+    // Attach event listeners for dynamic availability filtering
+    document.getElementById('proxy-hod-slot').addEventListener('change', updateAvailableFaculty);
+    document.getElementById('proxy-hod-date').addEventListener('input', updateAvailableFaculty);
+    document.getElementById('proxy-hod-date').addEventListener('change', updateAvailableFaculty);
+
+    // Initial calculation for default values
+    updateAvailableFaculty();
   });
 }
