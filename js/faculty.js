@@ -1074,11 +1074,13 @@ function openEditStudentModal(student) {
 async function openAssignProxyModal(slotId) {
   const [usersRes, ttRes] = await Promise.all([
     apiFetch('/admin/users'),
-    apiFetch('/faculty/timetable')
+    apiFetch('/admin/timetable')
   ]);
 
+  if (!usersRes.success || !ttRes.success) return;
+
   const currentUid = user.id || user.uid;
-  const staff = usersRes.data.filter(u => (u.role === 'faculty' || u.role === 'hod') && u.id !== currentUid);
+  const staff = usersRes.data.filter(u => (u.role === 'faculty' || u.role === 'hod') && u.department === user.department);
   const targetSlot = ttRes.data.find(s => s.id === slotId);
 
   if (!targetSlot) {
@@ -1106,8 +1108,9 @@ async function openAssignProxyModal(slotId) {
     <div class="form-group">
       <label for="proxy-fac-select">Assign Substitute Professor (Proxy)</label>
       <select class="form-control" name="proxyFacultyId" id="proxy-fac-select" required>
-        ${staff.map(f => `<option value="${f.id}">${f.name} (${f.role.toUpperCase()})</option>`).join('')}
+        <!-- Populated dynamically -->
       </select>
+      <div id="proxy-availability-notice" style="margin-top: 6px;"></div>
     </div>
     <div class="form-group">
       <label for="proxy-reason-input">Reason for Absence / Leave</label>
@@ -1116,10 +1119,16 @@ async function openAssignProxyModal(slotId) {
   `;
 
   openModal(`Assign Substitute Proxy Lecture`, contentHTML, async (formData) => {
+    const proxyFacId = formData.get('proxyFacultyId');
+    if (!proxyFacId) {
+      showToast('Please select an available substitute professor.', 'error');
+      return false;
+    }
+
     const payload = {
       timetableId: formData.get('timetableId'),
       date: formData.get('date'),
-      proxyFacultyId: formData.get('proxyFacultyId'),
+      proxyFacultyId: proxyFacId,
       reason: formData.get('reason')
     };
 
@@ -1135,6 +1144,18 @@ async function openAssignProxyModal(slotId) {
     }
     return false;
   });
+
+  const dateInput = document.getElementById('proxy-date-input');
+  const facSelect = document.getElementById('proxy-fac-select');
+  const noticeEl = document.getElementById('proxy-availability-notice');
+
+  function refreshFaculty() {
+    updateAvailableFaculty(targetSlot, dateInput.value, facSelect, noticeEl, staff, ttRes.data);
+  }
+
+  dateInput.addEventListener('input', refreshFaculty);
+  dateInput.addEventListener('change', refreshFaculty);
+  refreshFaculty();
 }
 
 async function renderProxyTab() {
@@ -1143,14 +1164,16 @@ async function renderProxyTab() {
 
   const [proxiesRes, ttRes, usersRes] = await Promise.all([
     apiFetch('/faculty/proxy-assignments'),
-    apiFetch('/faculty/timetable'),
+    apiFetch('/admin/timetable'),
     apiFetch('/admin/users')
   ]);
 
   if (!proxiesRes.success) return;
 
   const proxies = proxiesRes.data;
-  const timetableSlots = ttRes.data || [];
+  const allTimetableSlots = ttRes.data || [];
+  const currentUid = user.id || user.uid;
+  const myTimetableSlots = allTimetableSlots.filter(s => String(s.facultyId) === String(currentUid));
   const staff = (usersRes.data || []).filter(u => (u.role === 'faculty' || u.role === 'hod') && u.department === user.department);
 
   container.innerHTML = `
@@ -1262,13 +1285,12 @@ async function renderProxyTab() {
 
   // Bind create proxy general button
   document.getElementById('btn-create-proxy-general').addEventListener('click', async () => {
-    if (timetableSlots.length === 0) {
+    if (myTimetableSlots.length === 0) {
       showToast('No timetable slots found for your account.', 'error');
       return;
     }
 
-    const currentUid = user.id || user.uid;
-    const otherStaff = staff.filter(u => u.id !== currentUid);
+    const otherStaff = staff.filter(u => String(u.id) !== String(currentUid));
     if (otherStaff.length === 0) {
       showToast('No other department faculty available for proxy assignment.', 'warning');
       return;
@@ -1280,7 +1302,7 @@ async function renderProxyTab() {
       <div class="form-group">
         <label for="proxy-gen-slot">Select Your Timetable Lecture Slot</label>
         <select class="form-control" name="timetableId" id="proxy-gen-slot" required>
-          ${timetableSlots.map(s => `<option value="${s.id}">${s.subject ? s.subject.code + ' - ' + s.subject.name : 'Slot'} (${s.day}, Period ${s.period}, Sem-${s.semester} Batch-${s.division})</option>`).join('')}
+          ${myTimetableSlots.map(s => `<option value="${s.id}">${s.subject ? s.subject.code + ' - ' + s.subject.name : 'Slot'} (${s.day}, Period ${s.period}, Sem-${s.semester} Batch-${s.division})</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
@@ -1290,8 +1312,9 @@ async function renderProxyTab() {
       <div class="form-group">
         <label for="proxy-gen-fac">Assign Substitute Professor (Proxy)</label>
         <select class="form-control" name="proxyFacultyId" id="proxy-gen-fac" required>
-          ${otherStaff.map(f => `<option value="${f.id}">${f.name} (${f.role.toUpperCase()})</option>`).join('')}
+          <!-- Populated dynamically -->
         </select>
+        <div id="proxy-gen-availability-notice" style="margin-top: 6px;"></div>
       </div>
       <div class="form-group">
         <label for="proxy-gen-reason">Reason for Absence / Leave</label>
@@ -1300,10 +1323,16 @@ async function renderProxyTab() {
     `;
 
     openModal('Request Substitute Proxy Lecture', contentHTML, async (formData) => {
+      const proxyFacId = formData.get('proxyFacultyId');
+      if (!proxyFacId) {
+        showToast('Please select an available substitute professor.', 'error');
+        return false;
+      }
+
       const payload = {
         timetableId: formData.get('timetableId'),
         date: formData.get('date'),
-        proxyFacultyId: formData.get('proxyFacultyId'),
+        proxyFacultyId: proxyFacId,
         reason: formData.get('reason')
       };
 
@@ -1319,5 +1348,80 @@ async function renderProxyTab() {
       }
       return false;
     });
+
+    const slotSelect = document.getElementById('proxy-gen-slot');
+    const dateInput = document.getElementById('proxy-gen-date');
+    const facSelect = document.getElementById('proxy-gen-fac');
+    const noticeEl = document.getElementById('proxy-gen-availability-notice');
+
+    function refreshGenFaculty() {
+      const selectedSlotId = slotSelect.value;
+      const selectedSlot = myTimetableSlots.find(s => String(s.id) === String(selectedSlotId));
+      if (selectedSlot) {
+        updateAvailableFaculty(selectedSlot, dateInput.value, facSelect, noticeEl, staff, allTimetableSlots);
+      }
+    }
+
+    slotSelect.addEventListener('change', refreshGenFaculty);
+    dateInput.addEventListener('input', refreshGenFaculty);
+    dateInput.addEventListener('change', refreshGenFaculty);
+    refreshGenFaculty();
   });
+}
+
+// Helper to calculate & filter available faculty for selected slot and date
+function updateAvailableFaculty(slot, dateStr, facSelect, availabilityNotice, staff, allTimetableData) {
+  if (!slot || !dateStr || !facSelect) return;
+
+  const dateObj = new Date(dateStr + 'T00:00:00');
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dateDay = daysOfWeek[dateObj.getDay()];
+
+  const targetPeriod = parseInt(slot.period);
+  const targetDuration = slot.duration || 1;
+  const targetRoom = (slot.room || '').toLowerCase().trim();
+  const origFacultyId = slot.facultyId || (user ? (user.id || user.uid) : '');
+
+  const availableList = [];
+
+  staff.forEach(f => {
+    if (String(f.id) === String(origFacultyId)) return;
+
+    const overlapping = (allTimetableData || []).filter(c => {
+      if (String(c.facultyId) !== String(f.id)) return false;
+      if (c.day !== dateDay) return false;
+      const cPeriod = parseInt(c.period);
+      const cDuration = c.duration || 1;
+      return (cPeriod < targetPeriod + targetDuration) && (cPeriod + cDuration > targetPeriod);
+    });
+
+    if (overlapping.length === 0) {
+      availableList.push({
+        fac: f,
+        type: 'AVAILABLE',
+        label: `✓ ${f.name} (Available - No Class scheduled)`
+      });
+    } else {
+      const sameRoom = overlapping.every(c => (c.room || '').toLowerCase().trim() === targetRoom);
+      if (sameRoom) {
+        availableList.push({
+          fac: f,
+          type: 'SAME_LOCATION',
+          label: `✓ ${f.name} (Co-located - Same Room: ${slot.room || 'Lab'})`
+        });
+      }
+    }
+  });
+
+  if (availableList.length > 0) {
+    facSelect.innerHTML = availableList.map(item => `<option value="${item.fac.id}">${item.label}</option>`).join('');
+    if (availabilityNotice) {
+      availabilityNotice.innerHTML = `<span style="color: #166534; font-size: 0.78rem; font-weight: 600; background: #dcfce7; padding: 4px 8px; border-radius: 4px; display: inline-block;">✓ Found ${availableList.length} available substitute professor(s) for ${dateDay} Period ${targetPeriod}.</span>`;
+    }
+  } else {
+    facSelect.innerHTML = `<option value="" disabled selected>No faculty available (all busy in different rooms)</option>`;
+    if (availabilityNotice) {
+      availabilityNotice.innerHTML = `<span style="color: #dc2626; font-size: 0.78rem; font-weight: 600; background: #fee2e2; padding: 4px 8px; border-radius: 4px; display: inline-block;">⚠️ All department professors are teaching elsewhere on ${dateDay} Period ${targetPeriod}.</span>`;
+    }
+  }
 }
