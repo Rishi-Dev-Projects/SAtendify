@@ -2267,21 +2267,51 @@ async function renderProxyTab() {
       const isApproved = p.status === 'active' || p.status === 'approved';
       const isRejected = p.status === 'rejected';
 
-      let statusBadge = `<span class="badge badge-warning">⏳ Pending Approval</span>`;
-      if (isApproved) statusBadge = `<span class="badge badge-success">✓ Approved</span>`;
-      if (isRejected) statusBadge = `<span class="badge badge-danger">❌ Rejected</span>`;
+      let statusBadge = `
+        <span class="badge" style="background: #fef3c7; color: #d97706; border: 1px solid #fde68a; font-weight: 600; padding: 5px 10px; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 5px; border-radius: 6px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          Pending Approval
+        </span>
+      `;
+      if (isApproved) {
+        statusBadge = `
+          <span class="badge" style="background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-weight: 600; padding: 5px 10px; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 5px; border-radius: 6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            Approved & Active
+          </span>
+        `;
+      }
+      if (isRejected) {
+        statusBadge = `
+          <span class="badge" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; font-weight: 600; padding: 5px 10px; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 5px; border-radius: 6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+            Rejected
+          </span>
+        `;
+      }
 
       let opsHTML = '';
       if (isPending) {
         opsHTML = `
-          <button class="btn btn-success btn-approve-proxy" data-id="${p.id}" style="padding:4px 8px; font-size:0.75rem; margin-right:4px;">Approve</button>
-          <button class="btn btn-danger btn-reject-proxy" data-id="${p.id}" style="padding:4px 8px; font-size:0.75rem;">Reject</button>
+          <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: nowrap;">
+            <button class="btn btn-approve-proxy" data-id="${p.id}" style="background: #16a34a; color: #ffffff; border: none; font-weight: 600; padding: 6px 12px; font-size: 0.775rem; border-radius: var(--radius-md); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(22,163,74,0.25);">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Approve
+            </button>
+            <button class="btn btn-reject-proxy" data-id="${p.id}" style="background: #dc2626; color: #ffffff; border: none; font-weight: 600; padding: 6px 12px; font-size: 0.775rem; border-radius: var(--radius-md); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(220,38,38,0.25);">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              Reject
+            </button>
+          </div>
         `;
       } else {
         opsHTML = `
-          <button class="btn btn-secondary btn-cancel-proxy" data-id="${p.id}" style="padding:4px 8px; font-size:0.75rem;">
-            ${isRejected ? 'Delete Log' : 'Revoke'}
-          </button>
+          <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: nowrap;">
+            <button class="btn btn-cancel-proxy" data-id="${p.id}" style="background: #ffffff; color: #dc2626; border: 1px solid #fca5a5; font-weight: 600; padding: 6px 12px; font-size: 0.775rem; border-radius: var(--radius-md); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; transition: all 0.2s ease;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              ${isRejected ? 'Delete Log' : 'Revoke'}
+            </button>
+          </div>
         `;
       }
 
@@ -2296,7 +2326,7 @@ async function renderProxyTab() {
           <td><strong>${p.proxyFacultyName}</strong></td>
           <td><span style="font-size:0.825rem; color:var(--text-secondary);">${p.reason || 'Leave'}</span></td>
           <td>${statusBadge}</td>
-          <td style="text-align: right;">${opsHTML}</td>
+          <td style="text-align: right; white-space: nowrap; width: 1%;">${opsHTML}</td>
         </tr>
       `;
     }).join('');
