@@ -24,9 +24,19 @@ app.register_blueprint(hod_bp, url_prefix='/api/hod')
 app.register_blueprint(faculty_bp, url_prefix='/api/faculty')
 app.register_blueprint(student_bp, url_prefix='/api/student')
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy", "service": "SAtendify API", "cache": "warm"}), 200
+
 @app.route('/', methods=['GET'])
 def serve_index():
     return app.send_static_file('index.html')
+
+@app.after_request
+def add_performance_headers(response):
+    response.headers['Vary'] = 'Accept-Encoding'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 # Error Handlers for unified responses
 @app.errorhandler(400)
