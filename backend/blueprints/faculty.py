@@ -172,13 +172,26 @@ def get_timetable_roster(timetable_id):
         sub_snap = db.collection('subjects').document(sub_id).get()
         sub_data = sub_snap.to_dict() if sub_snap.exists else {"name": "Unknown", "code": ""}
         
-        # 3. Query all students enrolled in this department/semester/division
-        students_ref = db.collection('users')\
-                         .where('role', '==', 'student')\
-                         .where('department', '==', dept)\
-                         .where('semester', '==', sem)\
-                         .where('division', '==', div).stream()
-                         
+        slot_type = tt_data.get('type', 'lecture')
+        
+        # 3. Query students: Lectures apply to whole class (all divisions), Labs apply to specific division
+        try:
+            sem_int = int(sem)
+        except (ValueError, TypeError):
+            sem_int = sem
+
+        if slot_type == 'lab' and div and div != 'ALL':
+            students_ref = db.collection('users')\
+                             .where('role', '==', 'student')\
+                             .where('department', '==', dept)\
+                             .where('semester', '==', sem_int)\
+                             .where('division', '==', div).stream()
+        else:
+            students_ref = db.collection('users')\
+                             .where('role', '==', 'student')\
+                             .where('department', '==', dept)\
+                             .where('semester', '==', sem_int).stream()
+                          
         students_list = []
         for doc in students_ref:
             s_data = doc.to_dict()
@@ -186,17 +199,21 @@ def get_timetable_roster(timetable_id):
                 "id": doc.id,
                 "name": s_data.get('name'),
                 "rollNumber": s_data.get('rollNumber'),
-                "email": s_data.get('email')
+                "email": s_data.get('email'),
+                "division": s_data.get('division', 'N/A')
             })
             
         # Sort students alphabetically by roll number
         students_list.sort(key=lambda s: s.get('rollNumber', ''))
         
+        display_div = "ALL (Whole Class)" if (slot_type != 'lab' or div == 'ALL') else f"Div {div}"
+        
         data_payload = {
             "timetableCell": {
                 "id": timetable_id,
                 "semester": sem,
-                "division": div,
+                "division": display_div,
+                "type": slot_type,
                 "room": tt_data.get('room'),
                 "isProxy": is_proxy_user,
                 "subject": {

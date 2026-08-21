@@ -568,12 +568,13 @@ async function handleMockApi(endpoint, options) {
     }
 
     const users = getDB('sat_users') || [];
-    // Roster is students in cell.department, cell.semester, cell.division
+    const isLecture = !cell.type || cell.type === 'lecture';
+    // Lectures include whole class (all divisions of department & semester), Labs include specific division
     const roster = users.filter(u =>
       u.role === 'student' &&
       u.department === cell.department &&
       u.semester === cell.semester &&
-      u.division === cell.division
+      (isLecture || cell.division === 'ALL' || u.division === cell.division)
     );
 
     const subjects = getDB('sat_subjects') || [];
@@ -787,11 +788,9 @@ async function handleMockApi(endpoint, options) {
     });
 
     history.forEach(log => {
-      // Does this log roll up to this semester+division+dept?
-      if (log.semester === stdUser.semester && log.division === stdUser.division) {
-        const studentStatus = log.roster[userId];
-        if (studentStatus) {
-          const breakdown = subjectBreakdown[log.subjectId];
+      const studentStatus = log.roster ? log.roster[userId] : null;
+      if (studentStatus) {
+        const breakdown = subjectBreakdown[log.subjectId];
           if (breakdown) {
             breakdown.total++;
             if (studentStatus === 'present') {

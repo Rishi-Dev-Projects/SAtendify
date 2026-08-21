@@ -86,11 +86,15 @@ def get_student_attendance():
         # Batch pre-fetch users dictionary for faculty names
         users_dict = {doc.id: doc.to_dict().get('name', 'Assigned Professor') for doc in db.collection('users').stream()}
         
-        # 2. Fetch all attendance logs recorded for this class semester and division
+        # 2. Fetch all attendance logs recorded for this class semester (lectures apply to whole class, labs to division)
+        try:
+            sem_int = int(sem)
+        except (ValueError, TypeError):
+            sem_int = sem
+
         att_snaps = db.collection('attendance')\
                       .where('department', '==', dept)\
-                      .where('semester', '==', int(sem))\
-                      .where('division', '==', div).get()
+                      .where('semester', '==', sem_int).get()
                       
         # Accumulate metrics
         attended_count = 0

@@ -350,11 +350,13 @@ async function loadTakeAttendancePane(timetableId, prefillRoster = null, isEditF
     <div class="roster-list-container" id="student-roster-rows">
       ${students.map(std => {
         const currentStatus = presenceState[std.id] || 'present';
+        const divBadge = std.division ? `<span class="badge" style="font-size:0.7rem; background:var(--bg-secondary); font-family:monospace; margin-left:6px;">Div ${std.division}</span>` : '';
         return `
           <div class="roster-card-row ${currentStatus}-selected" id="roster-row-${std.id}">
             <div class="roster-student-details">
               <span class="roster-roll-badge">${std.rollNumber}</span>
               <span class="roster-student-name">${std.name}</span>
+              ${divBadge}
             </div>
             <!-- Interactive Toggles -->
             <div class="presence-selector">
