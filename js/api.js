@@ -791,24 +791,23 @@ async function handleMockApi(endpoint, options) {
       const studentStatus = log.roster ? log.roster[userId] : null;
       if (studentStatus) {
         const breakdown = subjectBreakdown[log.subjectId];
-          if (breakdown) {
-            breakdown.total++;
-            if (studentStatus === 'present') {
-              breakdown.attended++;
-            } else if (studentStatus === 'leave') {
-              breakdown.leave++;
-              // count Leave as neither present nor absolute missed depending on system, 
-              // for clean reports let's treat attending score as attended / total
-            } else {
-              breakdown.missed++;
-            }
-
-            breakdown.historyLog.push({
-              date: log.date,
-              status: studentStatus,
-              period: log.period
-            });
+        if (breakdown) {
+          breakdown.total++;
+          if (studentStatus === 'present') {
+            breakdown.attended++;
+          } else if (studentStatus === 'leave') {
+            breakdown.leave++;
+            // count Leave as neither present nor absolute missed depending on system, 
+            // for clean reports let's treat attending score as attended / total
+          } else {
+            breakdown.missed++;
           }
+
+          breakdown.historyLog.push({
+            date: log.date,
+            status: studentStatus,
+            period: log.period
+          });
         }
       }
     });
@@ -827,7 +826,7 @@ async function handleMockApi(endpoint, options) {
     // Sort all history logs that belong to the student
     const allStudLogs = [];
     history.forEach(log => {
-      if (log.semester === stdUser.semester && log.division === stdUser.division && log.roster[userId]) {
+      if (log.semester === stdUser.semester && log.roster && log.roster[userId]) {
         allStudLogs.push({ date: log.date, status: log.roster[userId] });
       }
     });
