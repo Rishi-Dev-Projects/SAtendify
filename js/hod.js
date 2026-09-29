@@ -2,6 +2,7 @@
 import { guardRoute } from './auth.js';
 import { initializeChrome } from './main.js';
 import { apiFetch, showToast } from './api.js';
+import { openTimetableBuilderStudio } from './timetableBuilder.js';
 
 // Route guard validation
 const user = guardRoute(['hod']);
@@ -119,11 +120,22 @@ function openModal(title, contentHTML, onSaveCallback, options = {}) {
     actionsBar.style.display = 'flex';
     actionsBar.innerHTML = options.customFooter;
   } else if (actionsBar) {
+    if (!document.getElementById('modal-save-btn')) {
+      actionsBar.innerHTML = `
+        <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="modal-save-btn">Save Allocation</button>
+      `;
+      const cancelBtn = document.getElementById('modal-cancel-btn');
+      if (cancelBtn) cancelBtn.onclick = () => closeModal();
+    }
     actionsBar.style.display = (onSaveCallback || !options.hideCancel) ? 'flex' : 'none';
     const saveBtn = document.getElementById('modal-save-btn');
     const cancelBtn = document.getElementById('modal-cancel-btn');
     if (saveBtn) saveBtn.style.display = onSaveCallback ? 'inline-flex' : 'none';
-    if (cancelBtn) cancelBtn.style.display = (options && options.hideCancel) ? 'none' : 'inline-flex';
+    if (cancelBtn) {
+      cancelBtn.textContent = onSaveCallback ? 'Cancel' : 'Close';
+      cancelBtn.style.display = (options && options.hideCancel) ? 'none' : 'inline-flex';
+    }
   }
 
   modalBackdrop.classList.add('show');
@@ -557,8 +569,11 @@ async function renderFacultyAssignmentsTab() {
           <td><span style="font-family: monospace; color: var(--text-secondary);">${f.email}</span></td>
           <td><span class="badge ${f.role === 'hod' ? 'badge-warning' : 'badge-success'}">${f.role.toUpperCase()}</span></td>
           <td><span class="badge badge-${(f.department || 'it').toLowerCase()}">${f.department || 'GEN'}</span></td>
-          <td style="text-align: right;" onclick="event.stopPropagation();">
-            <button class="btn btn-primary btn-allocate-course" data-id="${f.id}" style="padding: 6px 12px; font-size: 0.8rem;">Assign Course</button>
+          <td style="text-align: right;">
+            <button type="button" class="btn btn-primary btn-allocate-course" data-id="${f.id}" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.8rem; font-weight: 600;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+              Assign Course
+            </button>
           </td>
         </tr>
       `;
@@ -570,16 +585,18 @@ async function renderFacultyAssignmentsTab() {
 
   document.getElementById('faculty-table-rows').addEventListener('click', async (e) => {
     const allocateBtn = e.target.closest('.btn-allocate-course');
-    const profileRow = e.target.closest('.faculty-profile-row');
-
     if (allocateBtn) {
+      e.stopPropagation();
+      e.preventDefault();
       const fId = allocateBtn.dataset.id;
       const targetFac = staff.find(f => String(f.id) === String(fId));
       if (targetFac) openAllocateCourseModal(targetFac, deptSubjects);
       return;
     }
 
+    const profileRow = e.target.closest('.faculty-profile-row');
     if (profileRow) {
+      if (e.target.closest('td:last-child')) return;
       const fId = profileRow.dataset.id;
       const targetFac = staff.find(f => String(f.id) === String(fId));
       if (targetFac) {
@@ -593,16 +610,34 @@ async function renderFacultyAssignmentsTab() {
 
 function openFacultyProfileModal(f, subjects = [], deptSubjects = []) {
   const assignedSubs = (f.assignedSubjects || f.subjects || []).map(s => {
+    let subId = '';
+    let subName = '';
+    let subCode = '';
     if (typeof s === 'object' && s !== null) {
-      return `${s.code || ''} ${s.name || s.id || ''}`;
+      subId = s.id || '';
+      subName = s.name || s.id || '';
+      subCode = s.code || '';
+    } else {
+      subId = String(s);
+      const sObj = subjects.find(sub => String(sub.id) === String(s));
+      if (sObj) {
+        subName = sObj.name || sObj.id;
+        subCode = sObj.code || '';
+      } else {
+        subName = String(s);
+      }
     }
-    const sObj = subjects.find(sub => String(sub.id) === String(s));
-    return sObj ? `${sObj.code || ''} ${sObj.name || s}` : String(s);
+    return { id: subId, name: subName, code: subCode };
   });
 
   const initials = f.name ? f.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'F';
   const subHTML = assignedSubs.length > 0
-    ? assignedSubs.map(s => `<span class="badge badge-primary" style="margin: 3px 2px; padding: 5px 10px; font-size: 0.78rem; font-weight: 600;">${s}</span>`).join('')
+    ? assignedSubs.map(s => `
+        <span class="badge badge-primary" style="margin: 3px 2px; padding: 5px 8px 5px 10px; font-size: 0.78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+          <span>${s.code ? `${s.code} ` : ''}${s.name}</span>
+          <button type="button" class="btn-revoke-from-profile" data-sub-id="${s.id}" data-sub-name="${s.name}" title="Revoke course access" style="background: rgba(255,255,255,0.25); border: none; color: white; cursor: pointer; border-radius: 50%; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1; font-size: 13px;">&times;</button>
+        </span>
+      `).join('')
     : '<span style="font-size:0.85rem; color:var(--text-muted); font-style: italic;">No active courses assigned</span>';
 
   // Vector SVG Icons
@@ -758,16 +793,86 @@ function openFacultyProfileModal(f, subjects = [], deptSubjects = []) {
       openAllocateCourseModal(f, deptSubjects);
     };
   }
+
+  // Attach revoke listener for badges in profile modal
+  document.querySelectorAll('.btn-revoke-from-profile').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const subId = btn.dataset.subId;
+      const subName = btn.dataset.subName;
+      if (!confirm(`Are you sure you want to revoke "${subName}" from ${f.name}?`)) return;
+
+      btn.disabled = true;
+      const delRes = await apiFetch('/hod/faculty-subjects', {
+        method: 'DELETE',
+        body: JSON.stringify({
+          facultyId: f.id,
+          subjectId: subId
+        })
+      });
+
+      if (delRes.success) {
+        showToast(`Revoked "${subName}" from ${f.name}`, 'success');
+        f.assignedSubjects = (f.assignedSubjects || []).filter(s => String(typeof s === 'object' ? s.id : s) !== String(subId));
+        f.subjects = (f.subjects || []).filter(s => String(typeof s === 'object' ? s.id : s) !== String(subId));
+        await renderFacultyAssignmentsTab();
+        openFacultyProfileModal(f, subjects, deptSubjects);
+      } else {
+        showToast(delRes.error || 'Failed to revoke course', 'error');
+        btn.disabled = false;
+      }
+    };
+  });
 }
 
 function openAllocateCourseModal(professor, deptSubjects) {
-  const profSubs = professor.subjects || professor.assignedSubjects || [];
-  const unassignedSubjects = deptSubjects.filter(s => !profSubs.includes(s.id));
+  const profSubs = (professor.subjects || professor.assignedSubjects || []).map(s => {
+    if (typeof s === 'object' && s !== null) return String(s.id || s._id || '');
+    return String(s);
+  });
+  const unassignedSubjects = deptSubjects.filter(s => !profSubs.includes(String(s.id)));
+  const assignedList = profSubs.map(subId => {
+    const sObj = deptSubjects.find(s => String(s.id) === String(subId));
+    return sObj || { id: subId, name: subId, code: '', semester: '' };
+  });
 
-  if (unassignedSubjects.length === 0) {
-    showToast('All stream subjects are already assigned to this professor.', 'warning');
-    return;
-  }
+  const assignedSectionHTML = assignedList.length > 0 ? `
+    <div class="form-group" style="margin-top: 14px;">
+      <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; display: block;">
+        Currently Assigned Courses (${assignedList.length})
+      </label>
+      <div style="display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto;">
+        ${assignedList.map(s => `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.84rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              ${s.code ? `<span class="badge badge-primary" style="font-size: 0.7rem; padding: 2px 6px;">${s.code}</span>` : ''}
+              <span>${s.name} ${s.semester ? `(Semester ${s.semester})` : ''}</span>
+            </div>
+            <button type="button" class="btn-revoke-sub-btn" data-sub-id="${s.id}" data-sub-name="${s.name}" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; padding: 4px 9px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              Revoke
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  const allocateSectionHTML = unassignedSubjects.length > 0 ? `
+    <div class="form-group" style="margin-top: 14px;">
+      <label for="assign-subj-select">Allocate Stream Course</label>
+      <select class="form-control" name="subjectId" id="assign-subj-select">
+        ${unassignedSubjects.map(s => `<option value="${s.id}">${s.code} - ${s.name} (Semester ${s.semester})</option>`).join('')}
+      </select>
+    </div>
+  ` : `
+    <div class="form-group" style="margin-top: 14px;">
+      <div style="padding: 10px 12px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color); font-size: 0.825rem; color: var(--text-muted); font-style: italic;">
+        All department courses are currently assigned to this professor. You can revoke courses above if needed.
+      </div>
+    </div>
+  `;
 
   const contentHTML = `
     <div class="form-group">
@@ -775,15 +880,11 @@ function openAllocateCourseModal(professor, deptSubjects) {
       <input type="text" class="form-control" value="${professor.name}" readonly style="background:var(--bg-secondary);">
       <input type="hidden" name="facultyId" value="${professor.id}">
     </div>
-    <div class="form-group">
-      <label for="assign-subj-select">Allocate Stream Course</label>
-      <select class="form-control" name="subjectId" id="assign-subj-select">
-        ${unassignedSubjects.map(s => `<option value="${s.id}">${s.code} - ${s.name} (Semester ${s.semester})</option>`).join('')}
-      </select>
-    </div>
+    ${assignedSectionHTML}
+    ${allocateSectionHTML}
   `;
 
-  openModal('Allocate Course Subject', contentHTML, async (formData) => {
+  openModal('Manage Course Allocation', contentHTML, unassignedSubjects.length > 0 ? async (formData) => {
     const payload = {
       facultyId: formData.get('facultyId'),
       subjectId: formData.get('subjectId')
@@ -800,8 +901,43 @@ function openAllocateCourseModal(professor, deptSubjects) {
       return true;
     }
     return false;
+  } : null);
+
+  // Attach revoke click listeners in allocate modal
+  document.querySelectorAll('.btn-revoke-sub-btn').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.preventDefault();
+      const subId = btn.dataset.subId;
+      const subName = btn.dataset.subName;
+      if (!confirm(`Are you sure you want to revoke "${subName}" from ${professor.name}?`)) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Revoking...';
+
+      const delRes = await apiFetch('/hod/faculty-subjects', {
+        method: 'DELETE',
+        body: JSON.stringify({
+          facultyId: professor.id,
+          subjectId: subId
+        })
+      });
+
+      if (delRes.success) {
+        showToast(`Revoked "${subName}" from ${professor.name}`, 'success');
+        professor.assignedSubjects = (professor.assignedSubjects || []).filter(s => String(typeof s === 'object' ? s.id : s) !== String(subId));
+        professor.subjects = (professor.subjects || []).filter(s => String(typeof s === 'object' ? s.id : s) !== String(subId));
+        await renderFacultyAssignmentsTab();
+        openAllocateCourseModal(professor, deptSubjects);
+      } else {
+        showToast(delRes.error || 'Failed to revoke course', 'error');
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Revoke`;
+      }
+    };
   });
 }
+window.openAllocateCourseModal = openAllocateCourseModal;
+window.openFacultyProfileModal = openFacultyProfileModal;
 
 // ==========================================
 // 3. DEPARTMENT TIMETABLE BUILDER (No department switcher)
@@ -850,7 +986,13 @@ async function renderTimetableTab() {
           <!-- Populated dynamically -->
         </select>
       </div>
-      <button class="btn btn-primary" id="btn-refresh-grid" style="margin-left:auto;">Refresh Grid</button>
+      <div style="display:flex; gap:8px; margin-left:auto; align-items:flex-end;">
+        <button class="btn btn-secondary" id="btn-refresh-grid">Refresh Grid</button>
+        <button class="btn btn-primary" id="btn-open-auto-generator" style="background:linear-gradient(135deg, #4338ca 0%, #6366f1 100%); border:none; box-shadow:0 3px 10px rgba(79, 70, 229, 0.35); display:inline-flex; align-items:center; gap:6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          Auto Timetable Builder
+        </button>
+      </div>
     </div>
 
     <!-- Active Class Card Indicator -->
@@ -913,13 +1055,16 @@ async function renderTimetableTab() {
           const fac = users.find(u => u.id === cell.facultyId);
           const isStart = p.num === cell.period;
           const typeLabel = cell.type === 'lab' ? 'Lab' : cell.type === 'tutorial' ? 'Tut' : '';
+          const batchBadge = (cell.type === 'lecture' || cell.division === 'ALL')
+            ? `<span style="font-size:0.65rem; font-weight:normal; background:#f1f5f9; color:#475569; padding:2px 5px; border-radius:3px; margin-left:4px;">Whole Class</span>`
+            : `<span style="font-size:0.65rem; font-weight:normal; background:#dbeafe; color:#1e40af; padding:2px 5px; border-radius:3px; margin-left:4px;">Batch ${cell.division}</span>`;
 
           if (isStart) {
             gridHTML += `
               <div class="timetable-cell" id="tt-cell-${cell.id}" style="${cell.type && cell.type !== 'lecture' ? 'background: #f0fdf4; border-left: 3px solid var(--color-success);' : ''}">
                 <div>
                   <button class="cell-action-delete" data-id="${cell.id}">&times;</button>
-                  <div class="cell-subject">${sub ? sub.name : 'Subject'} ${typeLabel ? `<span style="font-size:0.7rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 4px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''}</div>
+                  <div class="cell-subject">${sub ? sub.name : 'Subject'} ${typeLabel ? `<span style="font-size:0.7rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 4px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''} ${batchBadge}</div>
                   <div class="cell-faculty"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px; color:var(--text-muted);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>${fac ? fac.name.replace('Prof. ', '').replace('Dr. ', '') : 'Faculty'}</div>
                 </div>
                 <div class="cell-room"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px; color:var(--text-muted);"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>${cell.room}</div>
@@ -1029,6 +1174,27 @@ async function renderTimetableTab() {
   });
   document.getElementById('tt-div-select').addEventListener('change', drawGrid);
   document.getElementById('btn-refresh-grid').addEventListener('click', drawGrid);
+  document.getElementById('btn-open-auto-generator').addEventListener('click', () => {
+    const sem = parseInt(document.getElementById('tt-sem-select').value);
+    const configuredBatches = semesterConfigs[sem] || 2;
+    const batchNames = getBatchNamesForSemester(sem, configuredBatches);
+
+    openTimetableBuilderStudio({
+      department: user.department,
+      semester: sem,
+      batches: batchNames,
+      subjects: subjects,
+      facultyList: users,
+      onApplied: async () => {
+        const newTtRes = await apiFetch('/admin/timetable');
+        if (newTtRes.success) {
+          timetable.length = 0;
+          timetable.push(...newTtRes.data);
+          drawGrid();
+        }
+      }
+    });
+  });
   window.addEventListener('resize', drawGrid);
   updateBatchOptions();
 
@@ -1198,11 +1364,11 @@ async function renderTakeAttendanceTab() {
 
   // Draw Today's timetable slot list
   let slotsHTML = '';
-  const triggerTimes = ['09:00', '10:00', '11:15', '13:00', '14:00'];
+  const triggerTimes = ['10:00', '11:00', '11:55', '13:20', '14:15', '15:20', '16:15'];
   const todayDate = new Date();
 
   todayClasses.forEach(item => {
-    const periodTimeStr = triggerTimes[item.period - 1];
+    const periodTimeStr = triggerTimes[item.period - 1] || '10:00';
     const triggerDate = new Date();
     const [hours, minutes] = periodTimeStr.split(':');
     triggerDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
@@ -1210,20 +1376,26 @@ async function renderTakeAttendanceTab() {
     const isAvailable = todayDate >= triggerDate;
     const timeHint = isAvailable ? '' : `Available at ${periodTimeStr}`;
 
+    const duration = item.duration || 1;
+    const periodText = duration > 1 ? `Period ${item.period}-${item.period + duration - 1}` : `Period ${item.period}`;
+    const typeLabel = item.type === 'lab' ? '🔬 Lab' : item.type === 'tutorial' ? '📖 Tut' : '';
+    const isWholeClass = (item.type === 'lecture' || item.division === 'ALL' || item.displayDivision === 'Whole Class');
+    const classLabel = isWholeClass ? `Sem-${item.semester} / Whole Class` : `Sem-${item.semester} / Batch-${item.division}`;
+
     slotsHTML += `
       <div class="timeline-slot-card" id="slot-card-${item.id}">
         <div class="slot-time-col">
-          <span class="slot-index">Period ${item.period}</span>
+          <span class="slot-index">${periodText}</span>
           <span class="slot-time-range">${periodTimeStr}</span>
         </div>
         
         <div class="slot-info-col">
           <div class="slot-header">
-            <span class="slot-subj-name">${item.subject ? item.subject.name : 'Syllabus Course'}</span>
+            <span class="slot-subj-name">${item.subject ? item.subject.name : 'Syllabus Course'} ${typeLabel ? `<span style="font-size:0.7rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 6px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''}</span>
             <span class="badge badge-${user.department.toLowerCase()}">${item.subject ? item.subject.code : ''}</span>
           </div>
           <div class="slot-meta">
-            <span>Class: <strong>Sem-${item.semester} / Div-${item.division}</strong></span>
+            <span>Class: <strong>${classLabel}</strong></span>
             <span>Room: <strong>${item.room}</strong></span>
           </div>
         </div>
@@ -1272,13 +1444,16 @@ async function loadTakeAttendancePane(timetableId) {
   const sub = rosterData.timetableCell.subject;
   const students = rosterData.roster;
 
+  const isWholeClass = (rosterData.timetableCell.type === 'lecture' || rosterData.timetableCell.division === 'ALL' || rosterData.timetableCell.displayDivision === 'Whole Class');
+  const cleanDiv = isWholeClass ? 'Whole Class' : `Batch-${String(rosterData.timetableCell.division).replace(/^(Div|Batch)\s*/i, '')}`;
+
   if (students.length === 0) {
     container.innerHTML = `
       <div class="empty-placeholder-box">
         <div class="empty-icon">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
         </div>
-        <p>No students enrolled in Class Sem-${rosterData.timetableCell.semester} Div-${rosterData.timetableCell.division}.</p>
+        <p>No students enrolled in Class Sem-${rosterData.timetableCell.semester} (${cleanDiv}).</p>
       </div>
     `;
     return;
@@ -1305,7 +1480,7 @@ async function loadTakeAttendancePane(timetableId) {
       <button class="btn btn-secondary" id="btn-back-to-timeline">Back to Today's timeline</button>
       <div>
         <h4 style="font-weight:700; text-align:right;">${sub.name} (${sub.code})</h4>
-        <p style="font-size:0.775rem; text-align:right; color:var(--text-secondary);">Sem-${rosterData.timetableCell.semester} - Div-${rosterData.timetableCell.division} | Room ${rosterData.timetableCell.room}</p>
+        <p style="font-size:0.775rem; text-align:right; color:var(--text-secondary);">Sem-${rosterData.timetableCell.semester} - ${cleanDiv} | Room ${rosterData.timetableCell.room}</p>
       </div>
     </div>
 
@@ -1582,7 +1757,7 @@ async function renderAttendanceTab() {
           <td><span style="font-weight: 700; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</span></td>
           <td><strong style="font-family: monospace; font-size: 0.85rem;">${h.date}</strong></td>
           <td><span class="badge badge-primary">P${h.period}</span></td>
-          <td><span class="badge badge-it">Sem-${h.semester} (${h.division})</span></td>
+          <td><span class="badge badge-it">Sem-${h.semester} (${(h.division === 'ALL' || h.type === 'lecture' || h.displayDivision === 'Whole Class') ? 'Whole Class' : (h.displayDivision || `Batch ${h.division}`)})</span></td>
           <td><strong>${h.facultyName}</strong></td>
           <td><strong>${h.subjectCode}</strong> <span style="font-size:0.8rem; color:var(--text-secondary);">&middot; ${h.subjectName}</span></td>
           <td>
@@ -1671,7 +1846,7 @@ async function openRosterEditModal(log, timetableId) {
   let rosterHTML = `
     <div style="margin-bottom: 16px;">
       <h4 style="font-weight:700; font-size: 1.1rem; margin-bottom: 4px;">${log.subjectCode} — ${log.subjectName}</h4>
-      <p style="font-size:0.8rem; color:var(--text-secondary);">Date: ${log.date} | Period: ${log.period} | Class: Sem-${log.semester} Div-${log.division}</p>
+      <p style="font-size:0.8rem; color:var(--text-secondary);">Date: ${log.date} | Period: ${log.period} | Class: Sem-${log.semester} ${(log.division === 'ALL' || log.type === 'lecture' || log.displayDivision === 'Whole Class') ? '(Whole Class)' : (log.displayDivision || `(Batch ${log.division})`)}</p>
     </div>
     
     <!-- Quick Actions -->

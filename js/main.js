@@ -220,7 +220,7 @@ export function exportReportToExcel(report) {
     ["Date of Session:", report.date],
     ["Period Slot:", `Period ${report.period}`],
     ["Department Stream:", `${report.department || 'General'} Engineering`],
-    ["Class Details:", `Semester ${report.semester} (Division ${report.division})`],
+    ["Class Details:", (report.division === 'ALL' || report.type === 'lecture' || report.displayDivision === 'Whole Class') ? `Semester ${report.semester} (Whole Class)` : `Semester ${report.semester} (${report.displayDivision || `Batch ${report.division}`})`],
     ["Subject:", `${report.subjectCode || ''} - ${report.subjectName || ''}`],
     ["Classroom / Lab Room:", report.room || 'N/A'],
     ["Total Enrolled Roster:", total],
@@ -346,7 +346,7 @@ export function showAbsenteeReportModal(report) {
           </div>
           <div style="text-align: right;">
             <div style="font-size: 0.85rem; font-weight: 700; font-family: monospace; background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 6px; display: inline-block;">${report.date}</div>
-            <div style="font-size: 0.75rem; opacity: 0.85; margin-top: 4px;">Period ${report.period} &middot; Sem-${report.semester} (${report.division})</div>
+            <div style="font-size: 0.75rem; opacity: 0.85; margin-top: 4px;">Period ${report.period} &middot; Sem-${report.semester} (${(report.division === 'ALL' || report.type === 'lecture' || report.displayDivision === 'Whole Class') ? 'Whole Class' : (report.displayDivision || `Batch ${report.division}`)})</div>
           </div>
         </div>
       </div>

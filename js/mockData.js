@@ -5,6 +5,13 @@ const SEMESTERS = [1, 2, 3, 4, 5, 6];
 const DIVISIONS = ['A', 'B'];
 
 const SUBJECTS_DATA = [
+  // IT Sem 3
+  { id: 'sub-it3-di03016011', name: 'Data Structures & Algorithms', code: 'DI03016011', department: 'IT', semester: 3, facultyId: 'usr-fac-1' },
+  { id: 'sub-it3-di03016021', name: 'Object-Oriented Programming (Java)', code: 'DI03016021', department: 'IT', semester: 3, facultyId: 'usr-fac-2' },
+  { id: 'sub-it3-di03016031', name: 'Database Management Systems', code: 'DI03016031', department: 'IT', semester: 3, facultyId: 'usr-fac-3' },
+  { id: 'sub-it3-di03016041', name: 'Digital Electronics & Logic Design', code: 'DI03016041', department: 'IT', semester: 3, facultyId: 'usr-fac-4' },
+  { id: 'sub-it3-di03016051', name: 'Computer Networks & Operating Systems', code: 'DI03016051', department: 'IT', semester: 3, facultyId: 'usr-hod-it' },
+
   // IT Sem 4
   { id: 'sub-it4-dbms', name: 'Database Management Systems', code: 'IT401', department: 'IT', semester: 4 },
   { id: 'sub-it4-cn', name: 'Computer Networks', code: 'IT402', department: 'IT', semester: 4 },
@@ -53,7 +60,41 @@ const USERS_DATA = [
   { id: 'usr-std-7', role: 'student', name: 'Dev Joshi', department: 'IT', semester: 4, division: 'A', rollNumber: '23IT007', dob: '14022004' },
   { id: 'usr-std-8', role: 'student', name: 'Meera Iyer', department: 'IT', semester: 4, division: 'A', rollNumber: '23IT008', dob: '08102004' },
   { id: 'usr-std-9', role: 'student', name: 'Vivaan Saxena', department: 'IT', semester: 4, division: 'A', rollNumber: '23IT009', dob: '25122004' },
-  { id: 'usr-std-10', role: 'student', name: 'Sneha Kulkarni', department: 'IT', semester: 4, division: 'A', rollNumber: '23IT010', dob: '11052005' }
+  { id: 'usr-std-10', role: 'student', name: 'Sneha Kulkarni', department: 'IT', semester: 4, division: 'A', rollNumber: '23IT010', dob: '11052005' },
+
+  // Students (IT Department, Sem 3 - Batch 251)
+  { id: 'student-256370316001', role: 'student', name: 'Aarav Sharma', department: 'IT', semester: 3, division: '251', rollNumber: '256370316001', dob: '01012006' },
+  { id: 'student-256370316002', role: 'student', name: 'Aditya Verma', department: 'IT', semester: 3, division: '251', rollNumber: '256370316002', dob: '01012006' },
+  { id: 'student-256370316003', role: 'student', name: 'Akshat Mehta', department: 'IT', semester: 3, division: '251', rollNumber: '256370316003', dob: '01012006' },
+  { id: 'student-256370316004', role: 'student', name: 'Ananya Joshi', department: 'IT', semester: 3, division: '251', rollNumber: '256370316004', dob: '01012006' },
+  { id: 'student-256370316005', role: 'student', name: 'Aryan Patel', department: 'IT', semester: 3, division: '251', rollNumber: '256370316005', dob: '01012006' },
+  { id: 'student-256370316006', role: 'student', name: 'Bhavya Shah', department: 'IT', semester: 3, division: '251', rollNumber: '256370316006', dob: '01012006' },
+  { id: 'student-256370316007', role: 'student', name: 'Chirag Desai', department: 'IT', semester: 3, division: '251', rollNumber: '256370316007', dob: '01012006' },
+  { id: 'student-256370316008', role: 'student', name: 'Devanshi Dave', department: 'IT', semester: 3, division: '251', rollNumber: '256370316008', dob: '01012006' },
+  { id: 'student-256370316009', role: 'student', name: 'Dhruv Trivedi', department: 'IT', semester: 3, division: '251', rollNumber: '256370316009', dob: '01012006' },
+  { id: 'student-256370316010', role: 'student', name: 'Harshil Soni', department: 'IT', semester: 3, division: '251', rollNumber: '256370316010', dob: '01012006' },
+  { id: 'student-256370316011', role: 'student', name: 'Ishita Bhatt', department: 'IT', semester: 3, division: '251', rollNumber: '256370316011', dob: '01012006' },
+  { id: 'student-256370316012', role: 'student', name: 'Jay Solanki', department: 'IT', semester: 3, division: '251', rollNumber: '256370316012', dob: '01012006' },
+  { id: 'student-256370316013', role: 'student', name: 'Khushi Panchal', department: 'IT', semester: 3, division: '251', rollNumber: '256370316013', dob: '01012006' },
+  { id: 'student-256370316014', role: 'student', name: 'Manav Parmar', department: 'IT', semester: 3, division: '251', rollNumber: '256370316014', dob: '01012006' },
+  { id: 'student-256370316015', role: 'student', name: 'Meet Prajapati', department: 'IT', semester: 3, division: '251', rollNumber: '256370316015', dob: '01012006' },
+
+  // Students (IT Department, Sem 3 - Batch 252)
+  { id: 'student-256370316016', role: 'student', name: 'Neha Rathod', department: 'IT', semester: 3, division: '252', rollNumber: '256370316016', dob: '01012006' },
+  { id: 'student-256370316017', role: 'student', name: 'Nishant Rawal', department: 'IT', semester: 3, division: '252', rollNumber: '256370316017', dob: '01012006' },
+  { id: 'student-256370316018', role: 'student', name: 'Omkar Chauhan', department: 'IT', semester: 3, division: '252', rollNumber: '256370316018', dob: '01012006' },
+  { id: 'student-256370316019', role: 'student', name: 'Prachi Vaghela', department: 'IT', semester: 3, division: '252', rollNumber: '256370316019', dob: '01012006' },
+  { id: 'student-256370316020', role: 'student', name: 'Pranav Makwana', department: 'IT', semester: 3, division: '252', rollNumber: '256370316020', dob: '01012006' },
+  { id: 'student-256370316021', role: 'student', name: 'Priya Jani', department: 'IT', semester: 3, division: '252', rollNumber: '256370316021', dob: '01012006' },
+  { id: 'student-256370316022', role: 'student', name: 'Rahul Barot', department: 'IT', semester: 3, division: '252', rollNumber: '256370316022', dob: '01012006' },
+  { id: 'student-256370316023', role: 'student', name: 'Riya Goswami', department: 'IT', semester: 3, division: '252', rollNumber: '256370316023', dob: '01012006' },
+  { id: 'student-256370316024', role: 'student', name: 'Sahil Kothari', department: 'IT', semester: 3, division: '252', rollNumber: '256370316024', dob: '01012006' },
+  { id: 'student-256370316025', role: 'student', name: 'Sakshi Pandya', department: 'IT', semester: 3, division: '252', rollNumber: '256370316025', dob: '01012006' },
+  { id: 'student-256370316026', role: 'student', name: 'Shivam Modi', department: 'IT', semester: 3, division: '252', rollNumber: '256370316026', dob: '01012006' },
+  { id: 'student-256370316027', role: 'student', name: 'Tanvi Shukla', department: 'IT', semester: 3, division: '252', rollNumber: '256370316027', dob: '01012006' },
+  { id: 'student-256370316028', role: 'student', name: 'Tirth Thakkar', department: 'IT', semester: 3, division: '252', rollNumber: '256370316028', dob: '01012006' },
+  { id: 'student-256370316029', role: 'student', name: 'Yashvi Doshi', department: 'IT', semester: 3, division: '252', rollNumber: '256370316029', dob: '01012006' },
+  { id: 'student-256370316030', role: 'student', name: 'Yuvraj Jadeja', department: 'IT', semester: 3, division: '252', rollNumber: '256370316030', dob: '01012006' }
 ];
 
 const PERIOD_SLOTS = [

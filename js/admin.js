@@ -2,6 +2,7 @@
 import { guardRoute } from './auth.js';
 import { initializeChrome } from './main.js';
 import { apiFetch, showToast } from './api.js';
+import { openTimetableBuilderStudio } from './timetableBuilder.js';
 
 // Route guard validation
 const user = guardRoute(['admin']);
@@ -1474,7 +1475,13 @@ async function renderTimetableTab() {
           <!-- Populated dynamically -->
         </select>
       </div>
-      <button class="btn btn-primary" id="btn-refresh-grid" style="margin-left:auto;">Refresh Grid</button>
+      <div style="display:flex; gap:8px; margin-left:auto; align-items:flex-end;">
+        <button class="btn btn-secondary" id="btn-refresh-grid">Refresh Grid</button>
+        <button class="btn btn-primary" id="btn-open-auto-generator" style="background:linear-gradient(135deg, #4338ca 0%, #6366f1 100%); border:none; box-shadow:0 3px 10px rgba(79, 70, 229, 0.35); display:inline-flex; align-items:center; gap:6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          Auto Timetable Builder
+        </button>
+      </div>
     </div>
 
     <!-- Active Class Card Indicator -->
@@ -1550,13 +1557,16 @@ async function renderTimetableTab() {
           const fac = users.find(u => u.id === cellVal.facultyId);
           const isStart = p.num === cellVal.period;
           const typeLabel = cellVal.type === 'lab' ? '🔬 Lab' : cellVal.type === 'tutorial' ? '📖 Tut' : '';
+          const batchBadge = (cellVal.type === 'lecture' || cellVal.division === 'ALL')
+            ? `<span style="font-size:0.65rem; font-weight:normal; background:#f1f5f9; color:#475569; padding:2px 5px; border-radius:3px; margin-left:4px;">Whole Class</span>`
+            : `<span style="font-size:0.65rem; font-weight:normal; background:#dbeafe; color:#1e40af; padding:2px 5px; border-radius:3px; margin-left:4px;">Batch ${cellVal.division}</span>`;
 
           if (isStart) {
             gridHTML += `
               <div class="timetable-cell" id="tt-cell-${cellVal.id}" style="${cellVal.type && cellVal.type !== 'lecture' ? 'background: #f0fdf4; border-left: 3px solid var(--color-success);' : ''}">
                 <div>
                   <button class="cell-action-delete" data-id="${cellVal.id}">&times;</button>
-                  <div class="cell-subject">${sub ? sub.name : 'Unknown'} ${typeLabel ? `<span style="font-size:0.7rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 4px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''}</div>
+                  <div class="cell-subject">${sub ? sub.name : 'Unknown'} ${typeLabel ? `<span style="font-size:0.7rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 4px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''} ${batchBadge}</div>
                   <div class="cell-faculty">👨‍🏫 ${fac ? fac.name.replace('Prof. ', '').replace('Dr. ', '') : 'Faculty'}</div>
                 </div>
                 <div class="cell-room">🚪 ${cellVal.room}</div>
@@ -1669,6 +1679,28 @@ async function renderTimetableTab() {
   });
   document.getElementById('tt-div-select').addEventListener('change', drawTimetableGrid);
   document.getElementById('btn-refresh-grid').addEventListener('click', drawTimetableGrid);
+  document.getElementById('btn-open-auto-generator').addEventListener('click', () => {
+    const dept = document.getElementById('tt-dept-select').value;
+    const sem = parseInt(document.getElementById('tt-sem-select').value);
+    const configuredBatches = semesterConfigs[sem] || 2;
+    const batchNames = getBatchNamesForSemester(sem, configuredBatches);
+
+    openTimetableBuilderStudio({
+      department: dept,
+      semester: sem,
+      batches: batchNames,
+      subjects: subjects,
+      facultyList: users,
+      onApplied: async () => {
+        const newTtRes = await apiFetch('/admin/timetable');
+        if (newTtRes.success) {
+          timetable.length = 0;
+          timetable.push(...newTtRes.data);
+          drawTimetableGrid();
+        }
+      }
+    });
+  });
 
   // Resize listener for table grid responsiveness
   window.addEventListener('resize', drawTimetableGrid);
@@ -2090,7 +2122,7 @@ async function openRosterEditModal(log, timetableId) {
   let rosterHTML = `
     <div style="margin-bottom: 16px;">
       <h4 style="font-weight:700; font-size: 1.1rem; margin-bottom: 4px;">${log.subjectCode} — ${log.subjectName}</h4>
-      <p style="font-size:0.8rem; color:var(--text-secondary);">Date: ${log.date} | Period: ${log.period} | Class: Sem-${log.semester} Div-${log.division}</p>
+      <p style="font-size:0.8rem; color:var(--text-secondary);">Date: ${log.date} | Period: ${log.period} | Class: Sem-${log.semester} ${(log.division === 'ALL' || log.type === 'lecture' || log.displayDivision === 'Whole Class') ? '(Whole Class)' : (log.displayDivision || `(Batch ${log.division})`)}</p>
     </div>
     
     <!-- Quick Actions -->

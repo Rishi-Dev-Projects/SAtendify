@@ -455,35 +455,37 @@ def process_timetable():
                     if s.get('department') == dept and s.get('semester') == sem:
                         is_cand_lecture = (slot_type == 'lecture')
                         is_exist_lecture = (s.get('type', 'lecture') == 'lecture')
-                        if is_cand_lecture or is_exist_lecture or s.get('division') == div:
+                        exist_div = s.get('division')
+                        if is_cand_lecture or is_exist_lecture or exist_div == div or exist_div == 'ALL':
                             return jsonify({
                                 "success": False, 
                                 "error": f"Conflict: Selected stream division is already scheduled for a class/lecture in this slot (overlapping Period {s_start} to {s_start + s_dur - 1})."
                             }), 409
 
-            # Determine target batches for this semester
-            target_batches = [div]
             if slot_type == 'lecture':
-                # Fetch semester batch configuration if present
-                cfg_snap = db.collection('configs').document('semester_batches').get()
-                cfg = cfg_snap.to_dict() if cfg_snap.exists else {}
-                max_batches = int(cfg.get(str(sem), 2))
-                
-                enrollment_year = 2026 - (sem - 1) // 2
-                year_suffix = str(enrollment_year % 100).zfill(2)
-                computed_batches = [f"{year_suffix}{i}" for i in range(1, max_batches + 1)]
-                for b in computed_batches:
-                    if b not in target_batches:
-                        target_batches.append(b)
-
-            saved_slots = []
-            for b in target_batches:
-                new_id = f"tt-slot-{dept.lower()}-{sem}-{b.lower()}-{day.lower()[:3]}-{period}"
+                new_id = f"tt-slot-{dept.lower()}-{sem}-all-{day.lower()[:3]}-{period}"
                 doc_ref = db.collection('timetables').document(new_id)
                 slot_payload = {
                     "department": dept,
                     "semester": sem,
-                    "division": b,
+                    "division": "ALL",
+                    "day": day,
+                    "period": period,
+                    "type": "lecture",
+                    "duration": duration,
+                    "subjectId": subject_id,
+                    "facultyId": faculty_id,
+                    "room": room
+                }
+                doc_ref.set(slot_payload)
+                return jsonify({"success": True, "data": dict(slot_payload, id=new_id)}), 201
+            else:
+                new_id = f"tt-slot-{dept.lower()}-{sem}-{div.lower()}-{day.lower()[:3]}-{period}"
+                doc_ref = db.collection('timetables').document(new_id)
+                slot_payload = {
+                    "department": dept,
+                    "semester": sem,
+                    "division": div,
                     "day": day,
                     "period": period,
                     "type": slot_type,
@@ -493,11 +495,7 @@ def process_timetable():
                     "room": room
                 }
                 doc_ref.set(slot_payload)
-                saved_slots.append(dict(slot_payload, id=new_id))
-
-            primary_id = f"tt-slot-{dept.lower()}-{sem}-{div.lower()}-{day.lower()[:3]}-{period}"
-            saved_data = dict(data, id=primary_id, type=slot_type, duration=duration)
-            return jsonify({"success": True, "data": saved_data, "all_synced": saved_slots}), 201
+                return jsonify({"success": True, "data": dict(slot_payload, id=new_id)}), 201
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
 
@@ -535,6 +533,78 @@ def delete_timetable_slot(id):
             doc_ref.delete()
 
         return jsonify({"success": True, "message": "Timetable lecture slot removed"}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@admin_bp.route('/timetable/bulk-apply', methods=['POST'])
+@require_auth(['admin', 'hod'])
+def bulk_apply_timetable():
+    """
+    Applies a generated timetable schedule for a stream and semester in one bulk operation.
+    Cleans up old slots for this stream/semester and writes all generated slots.
+    """
+    data = request.get_json() or {}
+    dept = data.get('department')
+    sem = data.get('semester')
+    slots = data.get('slots', [])
+
+    if not dept or sem is None or not slots:
+        return jsonify({"success": False, "error": "Department, semester, and slots are required."}), 400
+
+    # Role checks: HOD cannot modify other departments
+    if g.current_user.get('role') == 'hod' and g.current_user.get('department') != dept:
+        return jsonify({"success": False, "error": "Forbidden: cannot edit timetables for other departments."}), 403
+
+    try:
+        sem_int = int(sem)
+        # 1. Fetch and delete existing slots for this department and semester
+        existing_slots = db.collection('timetables')\
+                           .where('department', '==', dept)\
+                           .where('semester', '==', sem_int).stream()
+
+        batch = db.batch()
+        del_count = 0
+        for s_doc in existing_slots:
+            batch.delete(s_doc.reference)
+            del_count += 1
+            if del_count % 400 == 0:
+                batch.commit()
+                batch = db.batch()
+
+        # 2. Add new generated slots
+        saved_slots = []
+        for s in slots:
+            slot_type = s.get('type', 'lecture')
+            slot_div = "ALL" if (slot_type == 'lecture' or s.get('division') == 'ALL') else str(s.get('division', '241'))
+            day = s.get('day')
+            period = int(s.get('period'))
+            duration = int(s.get('duration', 2 if slot_type in ['lab', 'tutorial'] else 1))
+
+            new_id = f"tt-slot-{dept.lower()}-{sem_int}-{slot_div.lower()}-{day.lower()[:3]}-{period}"
+            doc_ref = db.collection('timetables').document(new_id)
+
+            payload = {
+                "department": dept,
+                "semester": sem_int,
+                "division": slot_div,
+                "day": day,
+                "period": period,
+                "type": slot_type,
+                "duration": duration,
+                "subjectId": s.get('subjectId'),
+                "facultyId": s.get('facultyId'),
+                "room": s.get('room', 'N/A')
+            }
+            batch.set(doc_ref, payload)
+            saved_slots.append(dict(payload, id=new_id))
+
+        batch.commit()
+        return jsonify({
+            "success": True,
+            "message": f"Successfully applied {len(saved_slots)} generated timetable slots.",
+            "data": saved_slots
+        }), 201
+
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

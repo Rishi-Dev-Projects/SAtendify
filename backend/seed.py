@@ -202,6 +202,14 @@ DEMO_USERS = [
 ]
 
 SUBJECTS = [
+    # IT Semester 3
+    {"id": "sub-it3-di03016011", "code": "DI03016011", "name": "Data Structures & Algorithms", "department": "IT", "semester": 3, "facultyId": "FLV24RyHPSYQZ5rWsa4V3pAmxWz2"},
+    {"id": "sub-it3-di03016021", "code": "DI03016021", "name": "Object-Oriented Programming (Java)", "department": "IT", "semester": 3, "facultyId": "IuG5aTNMBbNtpRSKAo75eMn5UAm1"},
+    {"id": "sub-it3-di03016031", "code": "DI03016031", "name": "Database Management Systems", "department": "IT", "semester": 3, "facultyId": "Z29x8aKMwSMhRuwgknuZE9mCLH63"},
+    {"id": "sub-it3-di03016041", "code": "DI03016041", "name": "Digital Electronics & Logic Design", "department": "IT", "semester": 3, "facultyId": "osseLhaAnKc4IZn1tW3fpcSfTna2"},
+    {"id": "sub-it3-di03016051", "code": "DI03016051", "name": "Computer Networks & Operating Systems", "department": "IT", "semester": 3, "facultyId": "vVDW2NExcnMxnEoQpGoD4gX9BeF3"},
+
+    # IT Semester 4
     {"id": "sub-it4-dbms", "code": "IT401", "name": "Database Management Systems", "department": "IT", "semester": 4, "facultyId": "usr-fac-1"},
     {"id": "sub-it4-cn", "code": "IT402", "name": "Computer Networks", "department": "IT", "semester": 4, "facultyId": "usr-fac-2"},
     {"id": "sub-it4-wad", "code": "IT403", "name": "Web Application Development", "department": "IT", "semester": 4, "facultyId": "usr-fac-3"},

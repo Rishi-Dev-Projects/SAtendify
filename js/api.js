@@ -483,6 +483,24 @@ async function handleMockApi(endpoint, options) {
     }
   }
 
+  // -- BULK APPLY GENERATED TIMETABLE --
+  if (endpoint === '/admin/timetable/bulk-apply' && method === 'POST') {
+    const { department, semester, slots } = body;
+    let tt = getDB('sat_timetable') || [];
+    const semInt = parseInt(semester);
+    tt = tt.filter(c => !(c.department === department && c.semester === semInt));
+    slots.forEach((s, idx) => {
+      tt.push({
+        id: `tt-slot-${department.toLowerCase()}-${semInt}-${String(s.division).toLowerCase()}-${s.day.toLowerCase().slice(0, 3)}-${s.period}`,
+        ...s,
+        department,
+        semester: semInt
+      });
+    });
+    setDB('sat_timetable', tt);
+    return { success: true, message: `Successfully applied ${slots.length} timetable slots.`, data: slots };
+  }
+
   // -- SEMESTER CONFIG ENDPOINT --
   if (endpoint === '/admin/semester-config') {
     let configs = getDB('sat_semester_config') || { "1": 2, "2": 2, "3": 2, "4": 2, "5": 2, "6": 2 };
@@ -513,6 +531,20 @@ async function handleMockApi(endpoint, options) {
       setDB('sat_users', users);
       return { success: true, data: users[index] };
     }
+    if (method === 'DELETE') {
+      const { facultyId, subjectId } = body;
+      const index = users.findIndex(u => u.id === facultyId);
+      if (index === -1) return { success: false, error: 'Faculty not found.' };
+
+      if (users[index].subjects) {
+        users[index].subjects = users[index].subjects.filter(s => String(s) !== String(subjectId));
+      }
+      if (users[index].assignedSubjects) {
+        users[index].assignedSubjects = users[index].assignedSubjects.filter(s => String(s) !== String(subjectId));
+      }
+      setDB('sat_users', users);
+      return { success: true, message: 'Course access revoked successfully.' };
+    }
   }
 
   // -- FACULTY EXCLUSIVE ROUTES --
@@ -540,14 +572,21 @@ async function handleMockApi(endpoint, options) {
         hist.date === todayFormatted
       );
 
+      const isLecture = !cell.type || cell.type === 'lecture';
+      const cleanDiv = (isLecture || cell.division === 'ALL') ? 'ALL' : cell.division;
+      const displayDiv = (isLecture || cell.division === 'ALL') ? 'Whole Class' : `Batch ${cell.division}`;
+
       return {
         id: cell.id,
         department: cell.department,
         semester: cell.semester,
-        division: cell.division,
+        division: cleanDiv,
+        displayDivision: displayDiv,
         day: cell.day,
         period: cell.period,
         room: cell.room,
+        type: cell.type || 'lecture',
+        duration: cell.duration || 1,
         subject: subInfo ? { id: subInfo.id, name: subInfo.name, code: subInfo.code } : null,
         isSubmittedToday: taken,
         isToday: cell.day === todayDayName
@@ -579,6 +618,8 @@ async function handleMockApi(endpoint, options) {
 
     const subjects = getDB('sat_subjects') || [];
     const subInfo = subjects.find(s => s.id === cell.subjectId);
+    const cleanDiv = (isLecture || cell.division === 'ALL') ? 'ALL' : cell.division;
+    const displayDiv = (isLecture || cell.division === 'ALL') ? 'Whole Class' : `Batch ${cell.division}`;
 
     return {
       success: true,
@@ -587,7 +628,9 @@ async function handleMockApi(endpoint, options) {
           id: cell.id,
           department: cell.department,
           semester: cell.semester,
-          division: cell.division,
+          division: cleanDiv,
+          displayDivision: displayDiv,
+          type: cell.type || 'lecture',
           period: cell.period,
           room: cell.room,
           subject: subInfo
@@ -610,13 +653,17 @@ async function handleMockApi(endpoint, options) {
     // Check if entry for this date/timetable already exists
     const existingIndex = history.findIndex(h => h.timetableId === timetableId && h.date === date);
 
+    const isLecture = !cell.type || cell.type === 'lecture';
+    const saveDiv = (isLecture || cell.division === 'ALL') ? 'ALL' : cell.division;
+
     const newRecord = {
       id: existingIndex === -1 ? `att-hist-${Date.now()}` : history[existingIndex].id,
       timetableId: cell.id,
       subjectId: cell.subjectId,
       date: date,
       semester: cell.semester,
-      division: cell.division,
+      division: saveDiv,
+      type: cell.type || 'lecture',
       period: cell.period,
       facultyId: currUser.role === 'faculty' ? currUser.id : (existingIndex === -1 ? cell.facultyId : history[existingIndex].facultyId),
       roster: roster

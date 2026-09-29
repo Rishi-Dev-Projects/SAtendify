@@ -233,7 +233,7 @@ async function renderTodayTimetable() {
             ${proxyBadge}
           </div>
           <div class="slot-meta">
-            <span>🏫 Class: <strong>Sem-${item.semester} / Batch-${item.division}</strong></span>
+            <span>🏫 Class: <strong>${(item.type === 'lecture' || item.division === 'ALL' || item.displayDivision === 'Whole Class') ? `Sem-${item.semester} / Whole Class` : `Sem-${item.semester} / Batch-${item.division}`}</strong></span>
             <span>🚪 Room: <strong>${item.room}</strong></span>
           </div>
         </div>
@@ -329,7 +329,7 @@ async function loadTakeAttendancePane(timetableId, prefillRoster = null, isEditF
       <button class="btn btn-secondary" id="btn-back-to-referral">${isEditFlow ? '← Back to History' : '← Back to Timeline'}</button>
       <div>
         <h4 style="font-weight:700; text-align:right;">${sub.name} (${sub.code})</h4>
-        <p style="font-size:0.775rem; text-align:right; color:var(--text-secondary);">Sem-${rosterData.timetableCell.semester} - Div-${rosterData.timetableCell.division} | Room ${rosterData.timetableCell.room}</p>
+        <p style="font-size:0.775rem; text-align:right; color:var(--text-secondary);">${`Sem-${rosterData.timetableCell.semester} - ${(rosterData.timetableCell.type === 'lecture' || rosterData.timetableCell.division === 'ALL' || rosterData.timetableCell.displayDivision === 'Whole Class') ? 'Whole Class' : `Batch-${String(rosterData.timetableCell.division).replace(/^(Div|Batch)\s*/i, '')}`} | Room ${rosterData.timetableCell.room}`}</p>
       </div>
     </div>
 
@@ -606,7 +606,7 @@ async function renderAttendanceHistory() {
           <td><span style="font-weight: 700; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</span></td>
           <td><strong style="font-family: monospace; font-size: 0.85rem;">${h.date}</strong></td>
           <td><span class="badge badge-primary">P${h.period}</span></td>
-          <td><span class="badge badge-it">Sem-${h.semester} (${h.division})</span></td>
+          <td><span class="badge badge-it">Sem-${h.semester} (${(h.division === 'ALL' || h.type === 'lecture' || h.displayDivision === 'Whole Class') ? 'Whole Class' : (h.displayDivision || `Batch ${h.division}`)})</span></td>
           <td><strong>${h.subjectCode}</strong> <span style="font-size:0.8rem; color:var(--text-secondary);">&middot; ${h.subjectName}</span></td>
           <td>
             <div style="display:flex; align-items:center; gap:8px;">
@@ -758,7 +758,7 @@ async function renderWeeklyTimetable() {
               <div class="timetable-cell" style="background-color: var(--color-accent-subtle); ${cell.type && cell.type !== 'lecture' ? 'border-left: 3px solid var(--color-success);' : ''}">
                 <div>
                   <div class="cell-subject" style="color:var(--color-accent);">${sub ? sub.name : 'Class'} ${typeLabel ? `<span style="font-size:0.65rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 4px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''}</div>
-                  <div class="cell-faculty">🏠 Sem-${cell.semester} (${cell.division})</div>
+                  <div class="cell-faculty">🏠 Sem-${cell.semester} (${(cell.type === 'lecture' || cell.division === 'ALL' || cell.displayDivision === 'Whole Class') ? 'Whole Class' : (cell.displayDivision || `Batch ${cell.division}`)})</div>
                 </div>
                 <div class="cell-room">🚪 Rm ${cell.room}</div>
               </div>
@@ -806,7 +806,7 @@ async function renderWeeklyTimetable() {
                   <div>
                     <span class="badge badge-primary">${periodText}</span>
                     <strong style="margin-left:6px; font-size:0.85rem;">${sub ? sub.name : 'Subject'} ${typeLabel ? `<span style="font-size:0.65rem; font-weight:normal; background:#dcfce7; color:#166534; padding:2px 4px; border-radius:3px; margin-left:4px;">${typeLabel}</span>` : ''}</strong>
-                    <span style="display:block; font-size:0.75rem; color:var(--text-secondary); margin-left:26px;">Sem-${c.semester} (${c.division}) &middot; Room ${c.room}</span>
+                    <span style="display:block; font-size:0.75rem; color:var(--text-secondary); margin-left:26px;">Sem-${c.semester} (${(c.type === 'lecture' || c.division === 'ALL' || c.displayDivision === 'Whole Class') ? 'Whole Class' : (c.displayDivision || `Batch ${c.division}`)}) &middot; Room ${c.room}</span>
                   </div>
                 </div>
               `;
@@ -1155,7 +1155,7 @@ async function openAssignProxyModal(slotId) {
   const contentHTML = `
     <div class="form-group">
       <label>Selected Lecture</label>
-      <input type="text" class="form-control" value="${targetSlot.subject ? targetSlot.subject.code + ' - ' + targetSlot.subject.name : 'Lecture Slot'} (Period ${targetSlot.period}, Sem-${targetSlot.semester} Batch-${targetSlot.division})" disabled readonly style="background:var(--bg-secondary); font-size:0.85rem;">
+      <input type="text" class="form-control" value="${targetSlot.subject ? targetSlot.subject.code + ' - ' + targetSlot.subject.name : 'Lecture Slot'} (Period ${targetSlot.period}, Sem-${targetSlot.semester} ${(targetSlot.type === 'lecture' || targetSlot.division === 'ALL' || targetSlot.displayDivision === 'Whole Class') ? 'Whole Class' : (targetSlot.displayDivision || `Batch-${targetSlot.division}`)})" disabled readonly style="background:var(--bg-secondary); font-size:0.85rem;">
       <input type="hidden" name="timetableId" value="${slotId}">
     </div>
     <div class="form-group">
@@ -1367,7 +1367,10 @@ async function renderProxyTab() {
       <div class="form-group">
         <label for="proxy-gen-slot">Select Your Timetable Lecture Slot</label>
         <select class="form-control" name="timetableId" id="proxy-gen-slot" required>
-          ${myTimetableSlots.map(s => `<option value="${s.id}">${s.subject ? s.subject.code + ' - ' + s.subject.name : 'Slot'} (${s.day}, Period ${s.period}, Sem-${s.semester} Batch-${s.division})</option>`).join('')}
+          ${myTimetableSlots.map(s => {
+            const slotDivStr = (s.type === 'lecture' || s.division === 'ALL' || s.displayDivision === 'Whole Class') ? 'Whole Class' : (s.displayDivision || `Batch-${s.division}`);
+            return `<option value="${s.id}">${s.subject ? s.subject.code + ' - ' + s.subject.name : 'Slot'} (${s.day}, Period ${s.period}, Sem-${s.semester} ${slotDivStr})</option>`;
+          }).join('')}
         </select>
       </div>
       <div class="form-group">

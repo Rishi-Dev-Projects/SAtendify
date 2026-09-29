@@ -59,14 +59,24 @@ def get_faculty_today_timetable():
                     "status": p_match.get('status', 'active')
                 }
             
+            slot_type = slot.get('type', 'lecture')
+            raw_div = slot.get('division')
+            if slot_type == 'lecture' or raw_div == 'ALL':
+                div_val = 'ALL'
+                display_div = 'Whole Class'
+            else:
+                div_val = str(raw_div) if raw_div else '241'
+                display_div = f"Batch {div_val}"
+            
             results.append({
                 "id": slot_id,
                 "period": slot.get('period'),
                 "semester": slot.get('semester'),
-                "division": slot.get('division'),
+                "division": div_val,
+                "displayDivision": display_div,
                 "room": slot.get('room'),
                 "day": slot.get('day'),
-                "type": slot.get('type', 'lecture'),
+                "type": slot_type,
                 "duration": slot.get('duration', 1),
                 "isToday": is_today,
                 "isSubmittedToday": is_submitted,
@@ -101,15 +111,25 @@ def get_faculty_today_timetable():
             att_snap = db.collection('attendance').document(att_id).get()
             is_submitted = att_snap.exists
             
+            slot_type = slot.get('type', 'lecture')
+            raw_div = slot.get('division')
+            if slot_type == 'lecture' or raw_div == 'ALL':
+                div_val = 'ALL'
+                display_div = 'Whole Class'
+            else:
+                div_val = str(raw_div) if raw_div else '241'
+                display_div = f"Batch {div_val}"
+
             results.append({
                 "id": tt_id,
                 "proxyAssignmentId": pdoc.id,
                 "period": slot.get('period'),
                 "semester": slot.get('semester'),
-                "division": slot.get('division'),
+                "division": div_val,
+                "displayDivision": display_div,
                 "room": slot.get('room'),
                 "day": slot.get('day'),
-                "type": slot.get('type', 'lecture'),
+                "type": slot_type,
                 "duration": slot.get('duration', 1),
                 "isToday": True,
                 "isProxy": True,
@@ -206,13 +226,16 @@ def get_timetable_roster(timetable_id):
         # Sort students alphabetically by roll number
         students_list.sort(key=lambda s: s.get('rollNumber', ''))
         
-        display_div = "ALL (Whole Class)" if (slot_type != 'lab' or div == 'ALL') else f"Div {div}"
+        is_whole_class = (slot_type != 'lab' or div == 'ALL')
+        clean_div = "ALL" if is_whole_class else str(div)
+        display_div = "Whole Class" if is_whole_class else f"Batch {clean_div}"
         
         data_payload = {
             "timetableCell": {
                 "id": timetable_id,
                 "semester": sem,
-                "division": display_div,
+                "division": clean_div,
+                "displayDivision": display_div,
                 "type": slot_type,
                 "room": tt_data.get('room'),
                 "isProxy": is_proxy_user,
@@ -304,12 +327,17 @@ def save_attendance():
                 "status": status
             })
             
+        slot_type = tt_data.get('type', 'lecture')
+        save_div = "ALL" if (slot_type != 'lab' or div == 'ALL') else str(div)
+        display_div = "Whole Class" if (slot_type != 'lab' or save_div == 'ALL') else f"Batch {save_div}"
+
         payload = {
             "subjectId": sub_id,
             "facultyId": faculty_id,
             "department": dept,
             "semester": sem,
-            "division": div,
+            "division": save_div,
+            "type": slot_type,
             "date": date_str,
             "period": period,
             "records": records_payload,
@@ -368,7 +396,9 @@ def save_attendance():
             "room": tt_data.get('room', 'N/A'),
             "department": dept,
             "semester": sem,
-            "division": div,
+            "division": save_div,
+            "displayDivision": display_div,
+            "type": slot_type,
             "subjectCode": sub_info.get('code'),
             "subjectName": sub_info.get('name'),
             "totalStudents": len(roster),
@@ -441,6 +471,10 @@ def get_attendance_report(att_id):
                 leave_count += 1
                 leave_students.append(student_item)
 
+        att_type = att_data.get('type') or tt_data.get('type', 'lecture')
+        att_div = att_data.get('division')
+        display_div = "Whole Class" if (att_type != 'lab' or att_div == 'ALL') else f"Batch {att_div}"
+
         report = {
             "attendanceId": att_id,
             "date": att_data.get('date'),
@@ -448,7 +482,9 @@ def get_attendance_report(att_id):
             "room": tt_data.get('room', 'N/A'),
             "department": att_data.get('department'),
             "semester": att_data.get('semester'),
-            "division": att_data.get('division'),
+            "division": att_div,
+            "displayDivision": display_div,
+            "type": att_type,
             "subjectCode": sub_info.get('code'),
             "subjectName": sub_info.get('name'),
             "totalStudents": len(records),
@@ -502,13 +538,19 @@ def get_faculty_history():
             # Reconstruct roster dict map for prefill options
             roster_map = {r.get('studentId'): r.get('status') for r in records}
             
+            log_div = log.get('division')
+            log_type = log.get('type', 'lecture')
+            display_div = "Whole Class" if (log_type != 'lab' or log_div == 'ALL') else f"Batch {log_div}"
+
             results.append({
                 "id": doc.id,
                 "timetableId": log.get('timetableId'),
                 "date": date_str,
                 "period": log.get('period'),
                 "semester": log.get('semester'),
-                "division": log.get('division'),
+                "division": log_div,
+                "displayDivision": display_div,
+                "type": log_type,
                 "subjectName": sub_info.get('name'),
                 "subjectCode": sub_info.get('code'),
                 "presentCount": present_count,

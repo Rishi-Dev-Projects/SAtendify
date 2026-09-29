@@ -107,6 +107,54 @@ def allocate_faculty_subject():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@hod_bp.route('/faculty-subjects', methods=['DELETE'])
+@require_auth(['hod'])
+def revoke_faculty_subject():
+    """
+    Revokes subject course syllabus assignment from faculty in their department.
+    """
+    dept = g.current_user.get('department')
+    data = request.get_json() or {}
+    faculty_id = data.get('facultyId')
+    subject_id = data.get('subjectId')
+    
+    if not faculty_id or not subject_id:
+        return jsonify({"success": False, "error": "facultyId and subjectId are required"}), 400
+        
+    try:
+        fac_ref = db.collection('users').document(faculty_id)
+        fac_snap = fac_ref.get()
+        if not fac_snap.exists:
+            return jsonify({"success": False, "error": "Faculty not found"}), 404
+            
+        fac_data = fac_snap.to_dict()
+        if fac_data.get('department') != dept:
+            return jsonify({"success": False, "error": "Forbidden: cannot modify faculty outside your department."}), 403
+            
+        sub_ref = db.collection('subjects').document(subject_id)
+        sub_snap = sub_ref.get()
+        if not sub_snap.exists:
+            return jsonify({"success": False, "error": "Subject not found"}), 404
+            
+        sub_data = sub_snap.to_dict()
+        if sub_data.get('department') != dept:
+            return jsonify({"success": False, "error": "Forbidden: cannot modify subjects outside your department."}), 403
+
+        batch = db.batch()
+        assigned_subs = list(fac_data.get('assignedSubjects', []))
+        if subject_id in assigned_subs:
+            assigned_subs.remove(subject_id)
+            batch.update(fac_ref, {"assignedSubjects": assigned_subs})
+            
+        if sub_data.get('facultyId') == faculty_id:
+            batch.update(sub_ref, {"facultyId": None})
+            
+        batch.commit()
+        return jsonify({"success": True, "message": "Course access revoked successfully."}), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @hod_bp.route('/attendance-logs', methods=['GET'])
 @require_auth(['hod'])
 def get_hod_attendance_logs():
@@ -142,13 +190,19 @@ def get_hod_attendance_logs():
             # Reconstruct roster dict map
             roster_map = {r.get('studentId'): r.get('status') for r in records}
             
+            log_div = log.get('division')
+            log_type = log.get('type', 'lecture')
+            display_div = "Whole Class" if (log_type != 'lab' or log_div == 'ALL') else f"Batch {log_div}"
+            
             results.append({
                 "id": doc.id,
                 "timetableId": log.get('timetableId'),
                 "date": log.get('date'),
                 "period": log.get('period'),
                 "semester": log.get('semester'),
-                "division": log.get('division'),
+                "division": log_div,
+                "displayDivision": display_div,
+                "type": log_type,
                 "subjectName": sub_info.get('name'),
                 "subjectCode": sub_info.get('code'),
                 "facultyName": fac_info.get('name'),

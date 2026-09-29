@@ -2107,5 +2107,49 @@ button, input, select, textarea {
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
 }
 
+/* ==========================================================================
+   Timetable Generator Studio Styles
+   ========================================================================== */
+.tt-studio-wrapper {
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.tt-studio-wrapper table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.tt-studio-wrapper input[type="number"]::-webkit-inner-spin-button,
+.tt-studio-wrapper input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+.tt-studio-wrapper ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.tt-studio-wrapper ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.tt-studio-wrapper ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.tt-studio-wrapper ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@media (max-width: 768px) {
+  .tt-studio-wrapper .studio-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+}
+
 
 
