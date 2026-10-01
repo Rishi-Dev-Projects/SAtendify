@@ -17,6 +17,7 @@ def require_auth(roles=None):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            t_auth_start = time.time()
             auth_header = request.headers.get('Authorization')
             if not auth_header or not auth_header.startswith('Bearer '):
                 return jsonify({"success": False, "error": "Missing or malformed Authorization header. Use Bearer <token>"}), 401
@@ -32,6 +33,7 @@ def require_auth(roles=None):
                 if time.time() - ts < CACHE_TTL:
                     g.current_user = dict(cached_profile)
                     g.current_user['uid'] = cached_uid
+                    g.auth_duration = round((time.time() - t_auth_start) * 1000, 2)
                     if roles and cached_profile.get('role') not in roles:
                         return jsonify({"success": False, "error": f"Access forbidden."}), 403
                     return f(*args, **kwargs)
@@ -87,6 +89,7 @@ def require_auth(roles=None):
             # Attach verified user document data to Flask global context
             g.current_user = user_profile
             g.current_user['uid'] = uid
+            g.auth_duration = round((time.time() - t_auth_start) * 1000, 2)
 
             # Handle specific role permissions validation
             if roles and user_profile.get('role') not in roles:

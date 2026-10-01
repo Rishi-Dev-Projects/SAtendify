@@ -39,19 +39,20 @@ def get_profile():
         assigned_sub_ids = user.get('assignedSubjects', [])
         sub_list = []
         if assigned_sub_ids:
+            from cache_service import get_cached_subjects
+            subs_map = get_cached_subjects(db)
             for s_id in assigned_sub_ids:
-                s_snap = db.collection('subjects').document(s_id).get()
-                if s_snap.exists:
-                    s_dict = s_snap.to_dict()
+                s_dict = subs_map.get(s_id)
+                if s_dict:
                     sub_list.append({"id": s_id, "name": s_dict.get('name'), "code": s_dict.get('code')})
         user_data["subjects"] = sub_list
 
         if role == 'hod' and dept:
             try:
-                fac_count = len(db.collection('users').where('role', '==', 'faculty').where('department', '==', dept).get())
-                stu_count = len(db.collection('users').where('role', '==', 'student').where('department', '==', dept).get())
-                user_data["deptFacultyCount"] = fac_count
-                user_data["deptStudentCount"] = stu_count
+                fac_agg = db.collection('users').where('role', '==', 'faculty').where('department', '==', dept).count().get()
+                stu_agg = db.collection('users').where('role', '==', 'student').where('department', '==', dept).count().get()
+                user_data["deptFacultyCount"] = int(fac_agg[0][0].value)
+                user_data["deptStudentCount"] = int(stu_agg[0][0].value)
             except Exception:
                 pass
 

@@ -24,9 +24,10 @@ def get_student_timetable():
         slots_snaps = db.collection('timetables')\
                         .where('department', '==', dept)\
                         .where('semester', '==', int(sem)).get()
-        # Batch pre-fetch subjects and users maps
-        subs_dict = {doc.id: doc.to_dict() for doc in db.collection('subjects').stream()}
-        users_dict = {doc.id: doc.to_dict().get('name', 'Professor') for doc in db.collection('users').stream()}
+        # Batch pre-fetch subjects and faculty names from memory cache
+        from cache_service import get_cached_subjects, get_cached_faculty_names
+        subs_dict = get_cached_subjects(db)
+        users_dict = get_cached_faculty_names(db)
                         
         results = []
         for doc in slots_snaps:
@@ -83,8 +84,9 @@ def get_student_attendance():
                        
         subjects_map = {doc.id: dict(doc.to_dict(), id=doc.id) for doc in subs_snaps}
         
-        # Batch pre-fetch users dictionary for faculty names
-        users_dict = {doc.id: doc.to_dict().get('name', 'Assigned Professor') for doc in db.collection('users').stream()}
+        # Batch pre-fetch faculty names from memory cache
+        from cache_service import get_cached_faculty_names
+        users_dict = get_cached_faculty_names(db)
         
         # 2. Fetch all attendance logs recorded for this class semester (lectures apply to whole class, labs to division)
         try:

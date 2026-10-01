@@ -1,4 +1,5 @@
 import datetime
+import re
 from flask import Blueprint, request, jsonify, g
 from firebase_admin import auth, firestore
 from config import db
@@ -101,14 +102,20 @@ def create_subject():
         if doc_ref.get().exists:
             return jsonify({"success": False, "error": "Subject code already exists"}), 409
             
-        doc_ref.set({
+        new_sub = {
             "name": name,
             "code": code,
             "department": dept,
             "semester": int(semester),
             "facultyId": data.get('facultyId', None)
-        })
-        return jsonify({"success": True, "data": dict(data, id=sub_id)}), 201
+        }
+        for field in ['lectureHours', 'labHours', 'tutorialHours', 'credits']:
+            if field in data and data[field] is not None:
+                try: new_sub[field] = int(data[field])
+                except (ValueError, TypeError): pass
+
+        doc_ref.set(new_sub)
+        return jsonify({"success": True, "data": dict(new_sub, id=sub_id)}), 201
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -122,13 +129,27 @@ def handle_subject_item(id):
             if not doc_ref.get().exists:
                 return jsonify({"success": False, "error": "Subject not found"}), 404
                 
-            doc_ref.update({
+            update_data = {
                 "name": data.get('name'),
                 "code": data.get('code'),
                 "department": data.get('department'),
                 "semester": int(data.get('semester')),
                 "facultyId": data.get('facultyId')
-            })
+            }
+            if 'lectureHours' in data and data['lectureHours'] is not None:
+                try: update_data['lectureHours'] = int(data['lectureHours'])
+                except (ValueError, TypeError): pass
+            if 'labHours' in data and data['labHours'] is not None:
+                try: update_data['labHours'] = int(data['labHours'])
+                except (ValueError, TypeError): pass
+            if 'tutorialHours' in data and data['tutorialHours'] is not None:
+                try: update_data['tutorialHours'] = int(data['tutorialHours'])
+                except (ValueError, TypeError): pass
+            if 'credits' in data and data['credits'] is not None:
+                try: update_data['credits'] = int(data['credits'])
+                except (ValueError, TypeError): pass
+
+            doc_ref.update(update_data)
             return jsonify({"success": True, "data": dict(data, id=id)}), 200
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
@@ -608,6 +629,193 @@ def bulk_apply_timetable():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@admin_bp.route('/timetable/parse-syllabus', methods=['POST'])
+@require_auth(['admin', 'hod'])
+def parse_syllabus_endpoint():
+    """
+    Parses uploaded GTU syllabus document(s) (PDF, Excel, CSV, Text) and extracts GTU course codes,
+    titles, lecture hours (L), lab hours (P), tutorial hours (T), and credits (C).
+    Supports single file or multiple file uploads at once.
+    """
+    try:
+        try:
+            from syllabus_parser import parse_syllabus_file
+        except ImportError:
+            from backend.syllabus_parser import parse_syllabus_file
+
+        dept = request.form.get('department') or (request.get_json() or {}).get('department') or g.current_user.get('department', 'IT')
+        sem_val = request.form.get('semester') or (request.get_json() or {}).get('semester')
+        try:
+            sem = int(sem_val) if sem_val is not None else None
+        except (ValueError, TypeError):
+            sem = None
+
+        all_subjects = []
+        seen_codes = set()
+        last_detected_sem = sem
+        last_detected_dept = dept
+        file_names = []
+
+        # Check for multi-file upload or single file upload
+        uploaded_files = request.files.getlist('files') or request.files.getlist('file')
+
+        if uploaded_files and len(uploaded_files) > 0 and uploaded_files[0].filename:
+            for f in uploaded_files:
+                if not f or not f.filename:
+                    continue
+                file_names.append(f.filename)
+                f_bytes = f.read()
+                d_sem, d_dept, subs = parse_syllabus_file(
+                    f_bytes, f.filename, default_sem=sem, default_dept=dept
+                )
+                if d_sem:
+                    last_detected_sem = d_sem
+                if d_dept:
+                    last_detected_dept = d_dept
+
+                for s in subs:
+                    code_up = str(s.get('code', '')).upper()
+                    if code_up and code_up not in seen_codes:
+                        seen_codes.add(code_up)
+                        all_subjects.append(s)
+        else:
+            json_data = request.get_json() or {}
+            if 'content' in json_data:
+                import base64
+                content = json_data['content']
+                filename = json_data.get('fileName', 'uploaded_syllabus.pdf')
+                file_names.append(filename)
+                try:
+                    file_bytes = base64.b64decode(content)
+                except Exception:
+                    file_bytes = content.encode('utf-8')
+                d_sem, d_dept, subs = parse_syllabus_file(
+                    file_bytes, filename, default_sem=sem, default_dept=dept
+                )
+                if d_sem: last_detected_sem = d_sem
+                if d_dept: last_detected_dept = d_dept
+                all_subjects.extend(subs)
+            elif 'text' in json_data:
+                filename = json_data.get('fileName', 'syllabus_text.txt')
+                file_names.append(filename)
+                file_bytes = json_data['text'].encode('utf-8')
+                d_sem, d_dept, subs = parse_syllabus_file(
+                    file_bytes, filename, default_sem=sem, default_dept=dept
+                )
+                if d_sem: last_detected_sem = d_sem
+                if d_dept: last_detected_dept = d_dept
+                all_subjects.extend(subs)
+
+        if not all_subjects:
+            return jsonify({
+                "success": False,
+                "error": "No GTU teaching scheme could be identified in the uploaded file(s). Please verify the document is an official GTU syllabus or teaching scheme."
+            }), 400
+
+        return jsonify({
+            "success": True,
+            "fileName": ", ".join(file_names) if file_names else "syllabus.pdf",
+            "detectedSemester": last_detected_sem or sem or 5,
+            "detectedDepartment": last_detected_dept or dept or "IT",
+            "totalSubjects": len(all_subjects),
+            "subjects": all_subjects
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to parse syllabus file: {str(e)}"}), 500
+
+@admin_bp.route('/timetable/import-syllabus-subjects', methods=['POST'])
+@require_auth(['admin', 'hod'])
+def import_syllabus_subjects():
+    """
+    Saves/imports confirmed syllabus subjects into Firestore subjects collection
+    and associates assigned teachers.
+    """
+    data = request.get_json() or {}
+    subjects_to_import = data.get('subjects', [])
+    dept = data.get('department') or g.current_user.get('department', 'IT')
+    sem_val = data.get('semester')
+
+    if not subjects_to_import:
+        return jsonify({"success": False, "error": "No subjects provided to import"}), 400
+
+    try:
+        saved_subjects = []
+        batch = db.batch()
+        batch_count = 0
+
+        def to_int(val, default=0):
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                m = re.search(r'\d+', str(val or ''))
+                return int(m.group(0)) if m else default
+
+        for s in subjects_to_import:
+            code = str(s.get('code', '')).strip().upper()
+            name = str(s.get('name', '')).strip()
+            if not code or not name:
+                continue
+
+            s_sem = to_int(s.get('semester') or sem_val, 5)
+            s_dept = str(s.get('department') or dept).strip().upper()
+            clean_code = re.sub(r'[^a-zA-Z0-9]', '', code).lower()
+            sub_id = f"sub-{s_dept.lower()}{s_sem}-{clean_code}"
+            doc_ref = db.collection('subjects').document(sub_id)
+
+            lec_h = to_int(s.get('lectureHours') if s.get('lectureHours') is not None else s.get('lectures'), 3)
+            lab_h = to_int(s.get('labHours') if s.get('labHours') is not None else s.get('practicals'), 2 if s.get('hasLab') else 0)
+            tut_h = to_int(s.get('tutorialHours') if s.get('tutorialHours') is not None else s.get('tutorials'), 0)
+            cred = to_int(s.get('credits'), lec_h + (lab_h // 2))
+
+            payload = {
+                "id": sub_id,
+                "code": code,
+                "name": name,
+                "department": s_dept,
+                "semester": s_sem,
+                "lectureHours": lec_h,
+                "labHours": lab_h,
+                "tutorialHours": tut_h,
+                "credits": cred,
+                "facultyId": s.get('facultyId') or None
+            }
+            batch.set(doc_ref, payload, merge=True)
+            saved_subjects.append(payload)
+            batch_count += 1
+
+            # Update assignedSubjects for faculty if assigned
+            fac_id = s.get('facultyId')
+            if fac_id:
+                try:
+                    f_ref = db.collection('users').document(fac_id)
+                    f_doc = f_ref.get()
+                    if f_doc.exists:
+                        assigned = f_doc.to_dict().get('assignedSubjects', [])
+                        if sub_id not in assigned:
+                            assigned.append(sub_id)
+                            f_ref.update({"assignedSubjects": assigned})
+                except Exception as fe:
+                    print(f"Error mapping faculty {fac_id}: {fe}")
+
+            if batch_count % 400 == 0:
+                batch.commit()
+                batch = db.batch()
+
+        if batch_count > 0:
+            batch.commit()
+
+        return jsonify({
+            "success": True,
+            "message": f"Successfully imported {len(saved_subjects)} subjects.",
+            "totalImported": len(saved_subjects),
+            "subjects": saved_subjects
+        }), 201
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ==========================================
 # 5. AGGREGATE REPORTS
 # ==========================================
@@ -664,17 +872,23 @@ def get_aggregate_reports():
 @require_auth(['admin'])
 def get_admin_analytics():
     try:
-        # 1. Total students
-        students_snap = db.collection('users').where('role', '==', 'student').get()
+        from cache_service import get_cached, set_cached, get_cached_subjects
+        
+        cached_analytics = get_cached('admin_analytics_summary', ttl=20)
+        if cached_analytics is not None:
+            return jsonify({"success": True, "data": cached_analytics}), 200
+
+        # 1. Total students & department breakdown (project only department field)
+        students_snap = list(db.collection('users').where('role', '==', 'student').select(['department']).stream())
         total_students = len(students_snap)
         
         # 2. Total faculty (faculty + HOD)
-        faculty_snap = db.collection('users').where('role', 'in', ['faculty', 'hod']).get()
+        faculty_snap = list(db.collection('users').where('role', 'in', ['faculty', 'hod']).select(['department']).stream())
         total_faculty = len(faculty_snap)
         
-        # 3. Total subjects
-        subjects_snap = db.collection('subjects').get()
-        total_subjects = len(subjects_snap)
+        # 3. Total subjects from cache
+        subs_map = get_cached_subjects(db)
+        total_subjects = len(subs_map)
         
         # 4. Stream-wise / Department breakdowns and global stats
         depts = ['IT', 'CE', 'ME', 'CH', 'EE']
@@ -692,7 +906,14 @@ def get_admin_analytics():
         dept_present = {d: 0 for d in depts}
         dept_total = {d: 0 for d in depts}
         
-        attendance_snap = db.collection('attendance').get()
+        # Retrieve today's attendance logs (or fallback to recent sessions if none taken today yet)
+        now_ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+        today_date_str = now_ist.strftime("%Y-%m-%d")
+        
+        attendance_snap = list(db.collection('attendance').where('date', '==', today_date_str).stream())
+        if not attendance_snap:
+            attendance_snap = list(db.collection('attendance').limit(15).stream())
+
         for doc in attendance_snap:
             att = doc.to_dict()
             d = att.get('department')
@@ -720,16 +941,15 @@ def get_admin_analytics():
                 "averageAttendance": dept_avg
             })
             
-        return jsonify({
-            "success": True,
-            "data": {
-                "totalStudents": total_students,
-                "totalFaculty": total_faculty,
-                "totalSubjects": total_subjects,
-                "averageAttendanceToday": average_attendance_today,
-                "deptBreakdown": dept_breakdown
-            }
-        }), 200
+        data_result = {
+            "totalStudents": total_students,
+            "totalFaculty": total_faculty,
+            "totalSubjects": total_subjects,
+            "averageAttendanceToday": average_attendance_today,
+            "deptBreakdown": dept_breakdown
+        }
+        set_cached('admin_analytics_summary', data_result)
+        return jsonify({"success": True, "data": data_result}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

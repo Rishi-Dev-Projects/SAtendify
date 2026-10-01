@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify
+from flask import Flask, jsonify, g
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -32,10 +32,24 @@ def health_check():
 def serve_index():
     return app.send_static_file('index.html')
 
+import time
+
+@app.before_request
+def start_request_timer():
+    g.req_start_time = time.time()
+
 @app.after_request
 def add_performance_headers(response):
     response.headers['Vary'] = 'Accept-Encoding'
     response.headers['X-Content-Type-Options'] = 'nosniff'
+    if hasattr(g, 'req_start_time'):
+        total_dur = round((time.time() - g.req_start_time) * 1000, 2)
+        auth_dur = getattr(g, 'auth_duration', None)
+        timings = []
+        if auth_dur is not None:
+            timings.append(f"auth;dur={auth_dur}")
+        timings.append(f"total;dur={total_dur}")
+        response.headers['Server-Timing'] = ', '.join(timings)
     return response
 
 # Error Handlers for unified responses

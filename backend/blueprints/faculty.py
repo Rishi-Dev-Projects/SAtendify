@@ -28,7 +28,8 @@ def get_faculty_today_timetable():
         slots_snap = db.collection('timetables').where('facultyId', '==', uid).get()
         
         # Batch pre-fetch subjects map, today's attendance logs, and active proxies
-        subs_dict = {doc.id: doc.to_dict() for doc in db.collection('subjects').stream()}
+        from cache_service import get_cached_subjects
+        subs_dict = get_cached_subjects(db)
         atts_today_set = set(doc.id for doc in db.collection('attendance').where('date', '==', today_date_str).stream())
         proxies_today_list = [p.to_dict() for p in db.collection('proxy_assignments').where('date', '==', today_date_str).where('status', 'in', ['active', 'approved']).stream()]
 
@@ -104,12 +105,10 @@ def get_faculty_today_timetable():
                 
             slot = tt_snap.to_dict()
             sub_id = slot.get('subjectId')
-            sub_snap = db.collection('subjects').document(sub_id).get()
-            sub_info = sub_snap.to_dict() if sub_snap.exists else {"name": "Unknown", "code": ""}
+            sub_info = subs_dict.get(sub_id, {"name": "Unknown", "code": ""})
             
             att_id = f"att-{tt_id}-{today_date_str}"
-            att_snap = db.collection('attendance').document(att_id).get()
-            is_submitted = att_snap.exists
+            is_submitted = (att_id in atts_today_set)
             
             slot_type = slot.get('type', 'lecture')
             raw_div = slot.get('division')

@@ -16,21 +16,36 @@ def get_hod_analytics():
         return jsonify({"success": False, "error": "Department configuration not mapped to HOD profile"}), 400
         
     try:
-        # 1. Total students inside department
-        students_ref = db.collection('users')\
+        import datetime
+        from cache_service import get_cached, set_cached
+        cache_key = f"hod_analytics_{dept}"
+        cached = get_cached(cache_key, ttl=20)
+        if cached is not None:
+            return jsonify({"success": True, "data": cached}), 200
+
+        # 1. Total students inside department (aggregation query)
+        students_agg = db.collection('users')\
                          .where('role', '==', 'student')\
-                         .where('department', '==', dept).stream()
-        total_students = len(list(students_ref))
+                         .where('department', '==', dept).count().get()
+        total_students = int(students_agg[0][0].value)
         
-        # 2. Total faculty teachers in department
-        faculty_ref = db.collection('users')\
+        # 2. Total faculty teachers in department (aggregation query)
+        faculty_agg = db.collection('users')\
                         .where('role', 'in', ['faculty', 'hod'])\
-                        .where('department', '==', dept).stream()
-        total_faculty = len(list(faculty_ref))
+                        .where('department', '==', dept).count().get()
+        total_faculty = int(faculty_agg[0][0].value)
         
         # 3. Calculated average department attendance today
-        att_logs_ref = db.collection('attendance')\
-                         .where('department', '==', dept).stream()
+        now_ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+        today_date_str = now_ist.strftime("%Y-%m-%d")
+        
+        att_logs_ref = list(db.collection('attendance')\
+                              .where('department', '==', dept)\
+                              .where('date', '==', today_date_str).stream())
+        if not att_logs_ref:
+            att_logs_ref = list(db.collection('attendance')\
+                                  .where('department', '==', dept)\
+                                  .limit(10).stream())
         
         present_count = 0
         total_records = 0
@@ -38,20 +53,21 @@ def get_hod_analytics():
             log = doc.to_dict()
             records = log.get('records', [])
             for r in records:
-                total_records += 1
-                if r.get('status') == 'present':
-                    present_count += 1
+                status = r.get('status')
+                if status in ['present', 'absent', 'leave']:
+                    total_records += 1
+                    if status == 'present':
+                        present_count += 1
                     
         avg = round((present_count / total_records * 100), 1) if total_records > 0 else 100.0
         
-        return jsonify({
-            "success": True,
-            "data": {
-                "totalStudents": total_students,
-                "totalFaculty": total_faculty,
-                "averageAttendanceToday": avg
-            }
-        }), 200
+        result_data = {
+            "totalStudents": total_students,
+            "totalFaculty": total_faculty,
+            "averageAttendanceToday": avg
+        }
+        set_cached(cache_key, result_data)
+        return jsonify({"success": True, "data": result_data}), 200
         
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
