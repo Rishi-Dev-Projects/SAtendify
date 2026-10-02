@@ -366,9 +366,12 @@ def save_attendance():
         absent_count = 0
         leave_count = 0
 
+        std_ids = list(roster.keys())
+        std_refs = [db.collection('users').document(s) for s in std_ids]
+        std_docs_map = {doc.id: doc.to_dict() for doc in db.get_all(std_refs) if doc.exists} if std_refs else {}
+
         for std_id, status in roster.items():
-            std_snap = db.collection('users').document(std_id).get()
-            sdata = std_snap.to_dict() if std_snap.exists else {}
+            sdata = std_docs_map.get(std_id, {})
             student_item = {
                 "id": std_id,
                 "rollNumber": sdata.get('rollNumber', 'N/A'),
@@ -446,11 +449,14 @@ def get_attendance_report(att_id):
         absent_count = 0
         leave_count = 0
 
+        std_ids = [r.get('studentId') for r in records if r.get('studentId')]
+        std_refs = [db.collection('users').document(s) for s in std_ids]
+        std_docs_map = {doc.id: doc.to_dict() for doc in db.get_all(std_refs) if doc.exists} if std_refs else {}
+
         for r in records:
             std_id = r.get('studentId')
             status = r.get('status')
-            std_snap = db.collection('users').document(std_id).get()
-            sdata = std_snap.to_dict() if std_snap.exists else {}
+            sdata = std_docs_map.get(std_id, {})
             student_item = {
                 "id": std_id,
                 "rollNumber": sdata.get('rollNumber', 'N/A'),

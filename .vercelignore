@@ -1,6 +1,9 @@
 backend/venv/
 backend/__pycache__/
 **/__pycache__/
+backend/seed*.py
+backend/restore*.py
 .env
 .env.template
 run.bat
+ABSTRACT.md

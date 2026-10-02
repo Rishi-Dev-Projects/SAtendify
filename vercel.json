@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "regions": ["bom1"],
   "builds": [
     {
       "src": "api/index.py",
@@ -25,6 +26,26 @@
     },
     {
       "handle": "filesystem"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/css/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/js/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
     }
   ]
 }

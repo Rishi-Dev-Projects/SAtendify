@@ -43,10 +43,10 @@ async function initFacultyDashboard(forcedTab = null) {
   if (modalCancel) modalCancel.addEventListener('click', closeModal);
   if (modalForm) modalForm.addEventListener('submit', handleModalSubmit);
 
-  const configRes = await apiFetch('/admin/semester-config');
-  if (configRes.success) {
-    semesterConfigs = configRes.data;
-  }
+  // Fetch semester configurations non-blockingly
+  apiFetch('/admin/semester-config').then(res => {
+    if (res && res.success) semesterConfigs = res.data;
+  }).catch(() => {});
 
   const urlParams = new URLSearchParams(window.location.search);
   const activeTab = forcedTab || urlParams.get('tab') || 'timetable-today';

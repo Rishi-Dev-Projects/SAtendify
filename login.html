@@ -226,7 +226,7 @@
         showToast(`Authentication success! Welcome, ${result.user.name}`, 'success');
         setTimeout(() => {
           window.location.href = `${result.user.role}.html`;
-        }, 800);
+        }, 120);
       } else {
         showToast(result.error || 'Authentication credential mismatch.', 'error');
       }
@@ -259,7 +259,7 @@
         showToast(`Welcome to Student Portal, ${result.user.name}!`, 'success');
         setTimeout(() => {
           window.location.href = 'student.html';
-        }, 800);
+        }, 120);
       } else {
         showToast(result.error || 'Invalid Roll Number or Date of Birth.', 'error');
       }

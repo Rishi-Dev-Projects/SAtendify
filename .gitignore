@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*$py.class
+backend/__pycache__/
+backend/blueprints/__pycache__/
+backend/venv/
+venv/
+.env
+.env.local
+.DS_Store

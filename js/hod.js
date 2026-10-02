@@ -986,8 +986,12 @@ async function renderTimetableTab() {
           <!-- Populated dynamically -->
         </select>
       </div>
-      <div style="display:flex; gap:8px; margin-left:auto; align-items:flex-end;">
+      <div style="display:flex; gap:8px; margin-left:auto; align-items:flex-end; flex-wrap:wrap;">
         <button class="btn btn-secondary" id="btn-refresh-grid">Refresh Grid</button>
+        <button class="btn btn-secondary" id="btn-open-syllabus-uploader" style="display:inline-flex; align-items:center; gap:6px; font-weight:600;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          Upload GTU Syllabus
+        </button>
         <button class="btn btn-primary" id="btn-open-auto-generator" style="background:linear-gradient(135deg, #4338ca 0%, #6366f1 100%); border:none; box-shadow:0 3px 10px rgba(79, 70, 229, 0.35); display:inline-flex; align-items:center; gap:6px;">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
           Auto Timetable Builder
@@ -1174,7 +1178,7 @@ async function renderTimetableTab() {
   });
   document.getElementById('tt-div-select').addEventListener('change', drawGrid);
   document.getElementById('btn-refresh-grid').addEventListener('click', drawGrid);
-  document.getElementById('btn-open-auto-generator').addEventListener('click', () => {
+  const openStudioHelper = (tab = 'criteria') => {
     const sem = parseInt(document.getElementById('tt-sem-select').value);
     const configuredBatches = semesterConfigs[sem] || 2;
     const batchNames = getBatchNamesForSemester(sem, configuredBatches);
@@ -1185,6 +1189,7 @@ async function renderTimetableTab() {
       batches: batchNames,
       subjects: subjects,
       facultyList: users,
+      initialTab: tab,
       onApplied: async () => {
         const newTtRes = await apiFetch('/admin/timetable');
         if (newTtRes.success) {
@@ -1194,7 +1199,13 @@ async function renderTimetableTab() {
         }
       }
     });
-  });
+  };
+
+  document.getElementById('btn-open-auto-generator').addEventListener('click', () => openStudioHelper('criteria'));
+  const syllabusBtn = document.getElementById('btn-open-syllabus-uploader');
+  if (syllabusBtn) {
+    syllabusBtn.addEventListener('click', () => openStudioHelper('syllabus'));
+  }
   window.addEventListener('resize', drawGrid);
   updateBatchOptions();
 

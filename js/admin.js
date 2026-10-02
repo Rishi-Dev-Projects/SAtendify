@@ -41,11 +41,10 @@ async function initAdminDashboard(forcedTab = null) {
   modalForm = document.getElementById('modal-form-element');
   modalContent = document.getElementById('modal-form-content');
 
-  // Fetch semester configurations
-  const configRes = await apiFetch('/admin/semester-config');
-  if (configRes.success) {
-    semesterConfigs = configRes.data;
-  }
+  // Fetch semester configurations non-blockingly (used in timetable builder)
+  apiFetch('/admin/semester-config').then(res => {
+    if (res && res.success) semesterConfigs = res.data;
+  }).catch(() => {});
 
   // Modal exit bindings
   if (modalClose) modalClose.onclick = () => closeModal();
@@ -459,118 +458,985 @@ function renderAdminCharts(deptBreakdown) {
 // ==========================================
 // 2. DEPARTMENTS & SUBJECTS TAB
 // ==========================================
+let subjectFilterState = {
+  search: '',
+  department: 'all',
+  semester: 'all',
+  viewMode: 'grouped' // 'grouped' (by semester) or 'flat'
+};
+
 async function renderDepartmentsTab() {
   const container = document.getElementById('dashboard-content');
   container.innerHTML = `<div class="skeleton-bar" style="width: 100%; height: 260px;"></div>`;
 
-  const [deptsRes, subsRes] = await Promise.all([
+  const [deptsRes, subsRes, usersRes] = await Promise.all([
     apiFetch('/admin/departments'),
-    apiFetch('/admin/subjects')
+    apiFetch('/admin/subjects'),
+    apiFetch('/admin/users')
   ]);
 
-  if (!deptsRes.success || !subsRes.success) return;
+  if (!deptsRes.success || !subsRes.success) {
+    container.innerHTML = `
+      <div class="panel-card" style="text-align: center; padding: 40px;">
+        <p style="color: var(--color-danger); font-weight: 600;">Failed to load subjects data.</p>
+        <button class="btn btn-secondary" onclick="renderDepartmentsTab()">Retry</button>
+      </div>
+    `;
+    return;
+  }
 
-  const depts = deptsRes.data;
-  const subjects = subsRes.data;
+  const depts = deptsRes.data || [];
+  const subjects = subsRes.data || [];
+  const facultyList = usersRes.success ? (usersRes.data || []).filter(u => u.role === 'faculty' || u.role === 'hod') : [];
+  const facultyMap = new Map(facultyList.map(f => [f.id, f.name]));
+
+  // Extract unique departments
+  const deptCodes = Array.from(new Set([
+    ...depts.map(d => (d.code || d.name || '').toUpperCase()).filter(Boolean),
+    ...subjects.map(s => (s.department || '').toUpperCase()).filter(Boolean)
+  ])).sort();
+  if (deptCodes.length === 0) deptCodes.push('IT', 'CE', 'ME', 'CH', 'EE');
+
+  // Compute counts
+  const deptCounts = {};
+  deptCodes.forEach(d => { deptCounts[d] = 0; });
+  const semCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  subjects.forEach(s => {
+    const d = (s.department || '').toUpperCase();
+    if (deptCounts[d] !== undefined) deptCounts[d]++;
+    const sem = parseInt(s.semester);
+    if (semCounts[sem] !== undefined) semCounts[sem]++;
+  });
+
+  function getFilteredSubjects() {
+    const q = (subjectFilterState.search || '').trim().toLowerCase();
+    const dept = subjectFilterState.department;
+    const sem = subjectFilterState.semester;
+
+    return subjects.filter(s => {
+      if (q) {
+        const nameMatch = (s.name || '').toLowerCase().includes(q);
+        const codeMatch = (s.code || '').toLowerCase().includes(q);
+        if (!nameMatch && !codeMatch) return false;
+      }
+      if (dept !== 'all' && (s.department || '').toUpperCase() !== dept.toUpperCase()) {
+        return false;
+      }
+      if (sem !== 'all' && String(s.semester) !== String(sem)) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  function renderSubjectRow(s, showSem = false) {
+    const lec = (s.lectureHours !== undefined && s.lectureHours !== null) ? s.lectureHours : (s.type === 'practical' ? 0 : 3);
+    const lab = (s.labHours !== undefined && s.labHours !== null) ? s.labHours : (s.type === 'theory' ? 0 : 2);
+    const tut = (s.tutorialHours !== undefined && s.tutorialHours !== null) ? s.tutorialHours : 0;
+    const cred = (s.credits !== undefined && s.credits !== null) ? s.credits : (lec + Math.round(lab / 2));
+    const facName = s.facultyId ? (facultyMap.get(s.facultyId) || 'Faculty') : null;
+    const deptClass = `badge-${(s.department || '').toLowerCase()}`;
+
+    let typeBadge = '';
+    if (lec > 0 && lab > 0) {
+      typeBadge = `<span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; background:#eff6ff; color:#1d4ed8; font-weight:600; margin-left:6px;">Theory + Lab</span>`;
+    } else if (lab > 0) {
+      typeBadge = `<span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; background:#ecfdf5; color:#047857; font-weight:600; margin-left:6px;">Lab Only</span>`;
+    } else {
+      typeBadge = `<span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; background:#f8fafc; color:#475569; font-weight:600; border:1px solid #e2e8f0; margin-left:6px;">Theory</span>`;
+    }
+
+    return `
+      <tr id="sub-row-${s.id}">
+        <td style="width: 140px;"><span class="roster-roll-badge">${s.code}</span></td>
+        <td>
+          <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+            ${s.name} ${typeBadge}
+          </div>
+        </td>
+        <td style="width: 110px;">
+          <span class="badge ${deptClass}">${s.department}</span>
+        </td>
+        ${showSem ? `<td style="width: 90px;"><span style="font-weight:600; font-size:0.82rem; color:var(--text-secondary);">Sem ${s.semester}</span></td>` : ''}
+        <td style="width: 150px;">
+          <span class="subject-workload-badge" title="Lectures: ${lec}h, Lab: ${lab}h, Tutorial: ${tut}h, Credits: ${cred}">
+            ${lec}L - ${lab}P ${cred ? `• ${cred} Cr` : ''}
+          </span>
+        </td>
+        <td style="width: 170px;">
+          ${facName ? `
+            <span style="font-size:0.82rem; color:var(--text-primary); display:inline-flex; align-items:center; gap:5px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              ${facName}
+            </span>
+          ` : `<span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Unassigned</span>`}
+        </td>
+        <td style="text-align: right; width: 130px;">
+          <button class="btn btn-secondary btn-edit-subj" data-id="${s.id}" style="padding: 5px 9px; font-size: 0.78rem;">Edit</button>
+          <button class="btn btn-danger btn-delete-subj" data-id="${s.id}" style="padding: 5px 9px; font-size: 0.78rem;">Delete</button>
+        </td>
+      </tr>
+    `;
+  }
 
   container.innerHTML = `
-    <!-- Full Width Panel: Courses/Subjects Table CRUD -->
-    <div class="panel-card">
-      <div class="panel-header">
-        <h3>Courses/Subjects</h3>
-        <button id="btn-add-subject" class="btn btn-primary">+ Register New Subject</button>
+    <!-- Header with Action Buttons -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+      <div>
+        <h3 style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text-primary);">Course & Subject Curriculum</h3>
+        <p style="margin:3px 0 0 0; font-size:0.82rem; color:var(--text-secondary);">
+          Organize courses, semester scheme workloads (L-P-C), and faculty mappings
+        </p>
       </div>
-      
-      <div class="table-responsive">
-        <table class="custom-table" id="subjects-list-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Subject Title</th>
-              <th>Department</th>
-              <th>Semester</th>
-              <th style="text-align: right;">Operations</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${subjects.map(s => `
-              <tr id="sub-row-${s.id}">
-                <td><span class="roster-roll-badge">${s.code}</span></td>
-                <td><strong>${s.name}</strong></td>
-                <td><span class="badge badge-${s.department.toLowerCase()}">${s.department}</span></td>
-                <td>Sem - ${s.semester}</td>
-                <td style="text-align: right;">
-                  <button class="btn btn-secondary btn-edit-subj" data-id="${s.id}" style="padding: 6px 10px; font-size: 0.8rem;">Edit</button>
-                  <button class="btn btn-danger btn-delete-subj" data-id="${s.id}" style="padding: 6px 10px; font-size: 0.8rem;">Delete</button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button id="btn-import-syllabus-subjects" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:0.84rem;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+          Upload GTU Syllabus
+        </button>
+        <button id="btn-add-subject" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px; font-size:0.84rem;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Register New Subject
+        </button>
       </div>
     </div>
+
+    <!-- Filter & Control Toolbar -->
+    <div class="subject-filter-toolbar">
+      <div class="subject-filter-row">
+        <!-- Search Input -->
+        <div class="subject-search-box">
+          <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="subject-search-input" placeholder="Search by subject name or code (e.g. Operating Systems, DI03016061)..." value="${subjectFilterState.search}">
+          <button id="btn-clear-subj-search" class="clear-btn" style="display: ${subjectFilterState.search ? 'flex' : 'none'};" title="Clear search">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <!-- Department Dropdown -->
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label for="subject-dept-filter" style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin:0; white-space:nowrap;">Dept:</label>
+          <select id="subject-dept-filter" class="form-control" style="width:auto; min-width:140px; padding:6px 10px; font-size:0.82rem; height:auto;">
+            <option value="all" ${subjectFilterState.department === 'all' ? 'selected' : ''}>All Depts (${subjects.length})</option>
+            ${deptCodes.map(d => `
+              <option value="${d}" ${subjectFilterState.department === d ? 'selected' : ''}>${d} (${deptCounts[d] || 0})</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <!-- Semester Dropdown -->
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label for="subject-sem-filter" style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin:0; white-space:nowrap;">Semester:</label>
+          <select id="subject-sem-filter" class="form-control" style="width:auto; min-width:140px; padding:6px 10px; font-size:0.82rem; height:auto;">
+            <option value="all" ${subjectFilterState.semester === 'all' ? 'selected' : ''}>All Semesters</option>
+            ${[1, 2, 3, 4, 5, 6].map(sem => `
+              <option value="${sem}" ${String(subjectFilterState.semester) === String(sem) ? 'selected' : ''}>Semester ${sem} (${semCounts[sem] || 0})</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <!-- View Mode Switcher -->
+        <div class="view-mode-toggle" title="Switch layout mode">
+          <button type="button" class="view-mode-btn ${subjectFilterState.viewMode === 'grouped' ? 'active' : ''}" data-mode="grouped">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            Grouped
+          </button>
+          <button type="button" class="view-mode-btn ${subjectFilterState.viewMode === 'flat' ? 'active' : ''}" data-mode="flat">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            Master Table
+          </button>
+        </div>
+
+        <!-- Reset Button -->
+        <button id="btn-reset-subj-filters" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem; font-weight:600; display:inline-flex; align-items:center; gap:5px;" title="Reset all filters">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+          Reset
+        </button>
+      </div>
+
+      <!-- Quick Semester Chips -->
+      <div class="subject-chip-group" id="subject-sem-chips">
+        <span style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); margin-right:4px; text-transform:uppercase; letter-spacing:0.5px;">Quick Filter:</span>
+        <button type="button" class="subject-chip ${subjectFilterState.semester === 'all' ? 'active' : ''}" data-sem="all">
+          All Semesters <span class="chip-count">${subjects.length}</span>
+        </button>
+        ${[1, 2, 3, 4, 5, 6].map(sem => `
+          <button type="button" class="subject-chip ${String(subjectFilterState.semester) === String(sem) ? 'active' : ''}" data-sem="${sem}">
+            Sem ${sem} <span class="chip-count">${semCounts[sem] || 0}</span>
+          </button>
+        `).join('')}
+      </div>
+
+      <!-- Live Count & Workload Summary -->
+      <div id="subject-count-indicator" style="font-size:0.8rem; color:var(--text-secondary); display:flex; align-items:center; flex-wrap:wrap; padding-top:6px; border-top:1px dashed var(--border-color);">
+        <!-- Filled dynamically -->
+      </div>
+    </div>
+
+    <!-- Subjects Content Area (Grouped or Flat Table) -->
+    <div id="subjects-content-area"></div>
   `;
 
-  // Bind register subject event
-  document.getElementById('btn-add-subject').addEventListener('click', openSubjectRegisterModal);
+  function renderSubjectsList() {
+    const filtered = getFilteredSubjects();
+    const contentArea = document.getElementById('subjects-content-area');
+    const countIndicator = document.getElementById('subject-count-indicator');
+    if (!contentArea) return;
 
-  // Edit / Delete bindings
-  const table = document.getElementById('subjects-list-table');
-  table.addEventListener('click', async (e) => {
+    // Calculate workload totals for filtered set
+    const totalLec = filtered.reduce((acc, s) => acc + (parseInt(s.lectureHours) || (s.type === 'practical' ? 0 : 3)), 0);
+    const totalLab = filtered.reduce((acc, s) => acc + (parseInt(s.labHours) || (s.type === 'theory' ? 0 : 2)), 0);
+    const totalCredits = filtered.reduce((acc, s) => acc + (parseInt(s.credits) || 0), 0);
+
+    if (countIndicator) {
+      countIndicator.innerHTML = `
+        <span>Showing <strong>${filtered.length}</strong> of ${subjects.length} courses</span>
+        ${filtered.length > 0 ? `
+          <span style="color:var(--text-muted); margin:0 8px;">•</span>
+          <span>Total Weekly Load: <strong>${totalLec}</strong> Lectures, <strong>${totalLab}</strong> Lab Hours</span>
+          ${totalCredits > 0 ? `<span style="color:var(--text-muted); margin:0 8px;">•</span><span><strong>${totalCredits}</strong> Total Credits</span>` : ''}
+        ` : ''}
+      `;
+    }
+
+    // Empty state
+    if (filtered.length === 0) {
+      contentArea.innerHTML = `
+        <div style="background:var(--bg-secondary); border:1px dashed var(--border-color); border-radius:var(--radius-md); padding:48px 24px; text-align:center;">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin:0 auto 12px; display:block;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          <div style="font-weight:700; color:var(--text-primary); font-size:1.05rem; margin-bottom:4px;">No matching subjects found</div>
+          <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 16px 0; max-width:440px; margin-left:auto; margin-right:auto;">
+            We couldn't find any courses matching your current filter or search criteria.
+          </p>
+          <button id="btn-reset-filters-empty" class="btn btn-secondary" style="font-size:0.82rem; padding:6px 14px; font-weight:600;">
+            Reset All Filters
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    if (subjectFilterState.viewMode === 'flat') {
+      // Master flat table sorted by Semester -> Department -> Code
+      const sorted = filtered.slice().sort((a, b) => {
+        const semDiff = (parseInt(a.semester) || 0) - (parseInt(b.semester) || 0);
+        if (semDiff !== 0) return semDiff;
+        const deptDiff = (a.department || '').localeCompare(b.department || '');
+        if (deptDiff !== 0) return deptDiff;
+        return (a.code || '').localeCompare(b.code || '');
+      });
+
+      contentArea.innerHTML = `
+        <div class="panel-card" style="padding:0; overflow:hidden;">
+          <div class="table-responsive">
+            <table class="custom-table" style="margin:0;">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Subject Title</th>
+                  <th>Department</th>
+                  <th>Semester</th>
+                  <th>Scheme (L-P-C)</th>
+                  <th>Assigned Faculty</th>
+                  <th style="text-align: right;">Operations</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sorted.map(s => renderSubjectRow(s, true)).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // Grouped by Semester (Default)
+    const semKeys = [1, 2, 3, 4, 5, 6].filter(sem => {
+      if (subjectFilterState.semester !== 'all') {
+        return String(sem) === String(subjectFilterState.semester);
+      }
+      return filtered.some(s => parseInt(s.semester) === sem);
+    });
+
+    contentArea.innerHTML = semKeys.map(sem => {
+      const semSubjects = filtered.filter(s => parseInt(s.semester) === sem);
+      if (semSubjects.length === 0) return '';
+
+      const semLec = semSubjects.reduce((acc, s) => acc + (parseInt(s.lectureHours) || (s.type === 'practical' ? 0 : 3)), 0);
+      const semLab = semSubjects.reduce((acc, s) => acc + (parseInt(s.labHours) || (s.type === 'theory' ? 0 : 2)), 0);
+      const semCredits = semSubjects.reduce((acc, s) => acc + (parseInt(s.credits) || 0), 0);
+
+      return `
+        <div class="subject-sem-section">
+          <div class="subject-sem-header">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span class="roster-roll-badge" style="background:#0f172a; color:#ffffff; border-color:#0f172a; font-size:0.85rem; padding:4px 10px;">
+                Semester ${sem}
+              </span>
+              <span style="font-weight:700; color:var(--text-primary); font-size:0.95rem;">
+                ${semSubjects.length} ${semSubjects.length === 1 ? 'Subject' : 'Subjects'}
+              </span>
+              <span style="font-size:0.78rem; color:var(--text-secondary); background:#f1f5f9; padding:2px 8px; border-radius:12px; border:1px solid #e2e8f0;">
+                ${semLec} Lectures/wk • ${semLab} Lab Hrs/wk ${semCredits > 0 ? `• ${semCredits} Credits` : ''}
+              </span>
+            </div>
+            <div>
+              <button class="btn btn-secondary btn-add-sub-sem" data-sem="${sem}" style="font-size:0.75rem; padding:5px 10px; font-weight:600; display:inline-flex; align-items:center; gap:5px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Add to Sem ${sem}
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="custom-table" style="margin:0;">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Subject Title</th>
+                  <th>Department</th>
+                  <th>Scheme (L-P-C)</th>
+                  <th>Assigned Faculty</th>
+                  <th style="text-align: right;">Operations</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${semSubjects.map(s => renderSubjectRow(s, false)).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Initial render of filtered list
+  renderSubjectsList();
+
+  // Search input binding
+  const searchInput = document.getElementById('subject-search-input');
+  const clearSearchBtn = document.getElementById('btn-clear-subj-search');
+  searchInput.addEventListener('input', (e) => {
+    subjectFilterState.search = e.target.value;
+    clearSearchBtn.style.display = subjectFilterState.search ? 'flex' : 'none';
+    renderSubjectsList();
+  });
+
+  clearSearchBtn.addEventListener('click', () => {
+    subjectFilterState.search = '';
+    searchInput.value = '';
+    clearSearchBtn.style.display = 'none';
+    renderSubjectsList();
+    searchInput.focus();
+  });
+
+  // Department filter binding
+  const deptSelect = document.getElementById('subject-dept-filter');
+  deptSelect.addEventListener('change', (e) => {
+    subjectFilterState.department = e.target.value;
+    renderSubjectsList();
+  });
+
+  // Semester filter dropdown binding
+  const semSelect = document.getElementById('subject-sem-filter');
+  semSelect.addEventListener('change', (e) => {
+    subjectFilterState.semester = e.target.value;
+    // Sync chip active state
+    document.querySelectorAll('.subject-chip').forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.sem === subjectFilterState.semester);
+    });
+    renderSubjectsList();
+  });
+
+  // Quick semester chips binding
+  const chipContainer = document.getElementById('subject-sem-chips');
+  chipContainer.addEventListener('click', (e) => {
+    const chip = e.target.closest('.subject-chip');
+    if (!chip) return;
+    const targetSem = chip.dataset.sem;
+    subjectFilterState.semester = targetSem;
+    semSelect.value = targetSem;
+    document.querySelectorAll('.subject-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    renderSubjectsList();
+  });
+
+  // View mode toggle binding
+  document.querySelectorAll('.view-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      subjectFilterState.viewMode = btn.dataset.mode;
+      document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderSubjectsList();
+    });
+  });
+
+  // Reset filters button binding
+  function resetAllFilters() {
+    subjectFilterState.search = '';
+    subjectFilterState.department = 'all';
+    subjectFilterState.semester = 'all';
+    searchInput.value = '';
+    clearSearchBtn.style.display = 'none';
+    deptSelect.value = 'all';
+    semSelect.value = 'all';
+    document.querySelectorAll('.subject-chip').forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.sem === 'all');
+    });
+    renderSubjectsList();
+  }
+
+  document.getElementById('btn-reset-subj-filters').addEventListener('click', resetAllFilters);
+
+  // Top action buttons
+  document.getElementById('btn-add-subject').addEventListener('click', () => {
+    const defaultDept = subjectFilterState.department !== 'all' ? subjectFilterState.department : 'IT';
+    const defaultSem = subjectFilterState.semester !== 'all' ? subjectFilterState.semester : '3';
+    openSubjectRegisterModal(defaultDept, defaultSem, facultyList);
+  });
+
+  const importSyllabusBtn = document.getElementById('btn-import-syllabus-subjects');
+  if (importSyllabusBtn) {
+    importSyllabusBtn.addEventListener('click', () => openSyllabusSubjectImportModal());
+  }
+
+  // Delegated operations inside subjects content area
+  const contentArea = document.getElementById('subjects-content-area');
+  contentArea.addEventListener('click', async (e) => {
     const editBtn = e.target.closest('.btn-edit-subj');
     const deleteBtn = e.target.closest('.btn-delete-subj');
+    const addSemBtn = e.target.closest('.btn-add-sub-sem');
+    const resetEmptyBtn = e.target.closest('#btn-reset-filters-empty');
+
+    if (resetEmptyBtn) {
+      resetAllFilters();
+      return;
+    }
+
+    if (addSemBtn) {
+      const sem = addSemBtn.dataset.sem;
+      const defaultDept = subjectFilterState.department !== 'all' ? subjectFilterState.department : 'IT';
+      openSubjectRegisterModal(defaultDept, sem, facultyList);
+      return;
+    }
 
     if (editBtn) {
       const subId = editBtn.dataset.id;
       const targetSub = subjects.find(s => s.id === subId);
-      if (targetSub) openSubjectEditModal(targetSub);
+      if (targetSub) openSubjectEditModal(targetSub, facultyList);
+      return;
     }
 
     if (deleteBtn) {
       const subId = deleteBtn.dataset.id;
-      if (confirm('Delete this Subject registers? It will break associated weekly timetables.')) {
+      const targetSub = subjects.find(s => s.id === subId);
+      const subLabel = targetSub ? `${targetSub.name} (${targetSub.code})` : 'this subject';
+      if (confirm(`Delete ${subLabel}? It will break any timetable sessions referencing it.`)) {
         const delRes = await apiFetch(`/admin/subjects/${subId}`, { method: 'DELETE' });
         if (delRes.success) {
           showToast('Subject deleted successfully', 'success');
           await renderDepartmentsTab();
+        } else {
+          showToast(delRes.error || 'Failed to delete subject', 'error');
         }
       }
     }
   });
 }
 
-function openSubjectRegisterModal() {
+/**
+ * Opens GTU Syllabus batch upload & subject importer modal
+ */
+async function openSyllabusSubjectImportModal() {
+  const usersRes = await apiFetch('/admin/users');
+  const facultyList = usersRes.success ? usersRes.data.filter(u => u.role === 'faculty' || u.role === 'hod') : [];
+
+  let selectedFiles = [];
+  let isExtracting = false;
+  let extractedSubjects = [];
+  let extractError = null;
+  let defaultDept = 'IT';
+  let defaultSem = '3';
+
+  function renderImportModalUI() {
+    const totalFiles = selectedFiles.length;
+    const totalSizeKb = (selectedFiles.reduce((acc, f) => acc + f.size, 0) / 1024).toFixed(1);
+
+    const html = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <!-- Header Info Card -->
+        <div style="background:#f8fafc; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 16px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <span class="badge" style="background:#4338ca; color:#fff; font-size:0.7rem; font-weight:700;">GTU AI Extractor</span>
+            <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary);">Gujarat Technological University Syllabus Importer</span>
+          </div>
+          <p style="font-size:0.775rem; color:var(--text-secondary); margin:0;">
+            Upload official individual subject syllabus PDFs (e.g. Operating Systems, Computer Networks) or semester-wide curriculum documents.
+            The system will extract Course Codes, Subject Names, and Teaching Schemes (L, T, P, C) and save them directly into the ERP subjects database.
+          </p>
+        </div>
+
+        <!-- Filter / Department Controls -->
+        <div class="form-row" style="margin-bottom:0;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="import-dept-select" style="font-size:0.8rem; font-weight:700;">Target Department</label>
+            <select class="form-control" id="import-dept-select" style="padding:6px 10px; font-size:0.85rem;">
+              <option value="IT" ${defaultDept === 'IT' ? 'selected' : ''}>Information Technology (IT)</option>
+              <option value="CE" ${defaultDept === 'CE' ? 'selected' : ''}>Computer Engineering (CE)</option>
+              <option value="ME" ${defaultDept === 'ME' ? 'selected' : ''}>Mechanical Engineering (ME)</option>
+              <option value="CH" ${defaultDept === 'CH' ? 'selected' : ''}>Chemical Engineering (CH)</option>
+              <option value="EE" ${defaultDept === 'EE' ? 'selected' : ''}>Electrical Engineering (EE)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="import-sem-select" style="font-size:0.8rem; font-weight:700;">Target Semester (Fallback)</label>
+            <select class="form-control" id="import-sem-select" style="padding:6px 10px; font-size:0.85rem;">
+              <option value="1" ${defaultSem === '1' ? 'selected' : ''}>Semester 1</option>
+              <option value="2" ${defaultSem === '2' ? 'selected' : ''}>Semester 2</option>
+              <option value="3" ${defaultSem === '3' ? 'selected' : ''}>Semester 3</option>
+              <option value="4" ${defaultSem === '4' ? 'selected' : ''}>Semester 4</option>
+              <option value="5" ${defaultSem === '5' ? 'selected' : ''}>Semester 5</option>
+              <option value="6" ${defaultSem === '6' ? 'selected' : ''}>Semester 6</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- File Upload / Dropzone -->
+        <div>
+          ${totalFiles === 0 ? `
+            <div id="modal-syllabus-dropzone" style="border:2px dashed var(--border-color); border-radius:var(--radius-lg); padding:26px 16px; text-align:center; background:#ffffff; cursor:pointer; transition:all 0.2s;">
+              <input type="file" id="modal-syllabus-file-input" accept=".pdf,.xlsx,.xls,.csv,.txt" multiple style="display:none;">
+              <div style="display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:50%; background:var(--color-accent-subtle); color:var(--color-accent); margin-bottom:8px;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              </div>
+              <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary); margin-bottom:3px;">
+                Drop GTU syllabus file(s) here, or <span style="color:var(--color-accent); text-decoration:underline;">browse files</span>
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:8px;">
+                Select single or multiple separate subject syllabus PDFs (e.g. OS, CN, DBMS, AI)
+              </div>
+              <div style="display:flex; justify-content:center; gap:6px; flex-wrap:wrap;">
+                <span class="badge" style="background:#eef2ff; color:#3730a3; font-size:0.7rem;">Batch Multi-File</span>
+                <span class="badge" style="background:#f0fdf4; color:#166534; font-size:0.7rem;">Individual Subject PDFs</span>
+                <span class="badge" style="background:#f8fafc; color:#475569; font-size:0.7rem;">PDF / Excel / CSV</span>
+              </div>
+            </div>
+          ` : `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:var(--radius-md); padding:10px 14px; flex-wrap:wrap; gap:10px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:#dcfce7; color:#15803d;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                </span>
+                <div>
+                  <div style="font-weight:700; font-size:0.875rem; color:#14532d;">
+                    ${totalFiles === 1 ? selectedFiles[0].name : `${totalFiles} GTU Syllabus Files Selected`}
+                  </div>
+                  <div style="font-size:0.75rem; color:#166534;">
+                    ${totalSizeKb} KB total &middot; Ready to extract
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <button type="button" class="btn btn-secondary" id="btn-modal-clear-files" style="font-size:0.775rem; padding:4px 10px;">Change Files</button>
+                <button type="button" class="btn btn-primary" id="btn-modal-start-extract" style="font-size:0.775rem; padding:5px 14px; background:#16a34a; border-color:#16a34a; font-weight:700; display:inline-flex; align-items:center; gap:5px;" ${isExtracting ? 'disabled' : ''}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                  ${isExtracting ? 'Extracting...' : 'Extract Subjects'}
+                </button>
+              </div>
+            </div>
+          `}
+        </div>
+
+        <!-- Loading State -->
+        ${isExtracting ? `
+          <div style="text-align:center; padding:24px 16px; background:white; border:1px solid var(--border-color); border-radius:var(--radius-md);">
+            <div class="spinner" style="margin:0 auto 10px auto; width:28px; height:28px; border:3px solid var(--border-color); border-top-color:var(--color-accent); border-radius:50%; animation:spin 1s linear infinite;"></div>
+            <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">Extracting Subjects from Syllabus...</div>
+            <div style="font-size:0.775rem; color:var(--text-secondary); margin-top:2px;">Reading GTU course codes, titles, and teaching hours (L, T, P, C)</div>
+          </div>
+        ` : ''}
+
+        <!-- Error State -->
+        ${extractError ? `
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:var(--radius-md); padding:10px 14px; color:#991b1b; font-size:0.8rem; display:flex; align-items:center; gap:8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>${extractError}</span>
+          </div>
+        ` : ''}
+
+        <!-- Extracted Subjects Table -->
+        ${extractedSubjects.length > 0 && !isExtracting ? `
+          <div style="border:1px solid var(--border-color); border-radius:var(--radius-md); overflow:hidden; background:white;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#f1f5f9; border-bottom:1px solid var(--border-color);">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" id="modal-select-all-subs" ${extractedSubjects.every(s => s.checked) ? 'checked' : ''} style="cursor:pointer; width:15px; height:15px;">
+                <label for="modal-select-all-subs" style="font-weight:700; font-size:0.85rem; color:var(--text-primary); cursor:pointer; margin:0;">
+                  Extracted Subjects (${extractedSubjects.filter(s => s.checked).length}/${extractedSubjects.length} selected)
+                </label>
+              </div>
+              <span class="badge" style="background:#2563eb; color:#fff; font-size:0.75rem; font-weight:700;">Ready to Save</span>
+            </div>
+            <div style="max-height:280px; overflow-y:auto;">
+              <table class="custom-table" style="margin:0; font-size:0.8rem;">
+                <thead style="position:sticky; top:0; background:#f8fafc; z-index:1;">
+                  <tr>
+                    <th style="width:36px; text-align:center;">#</th>
+                    <th style="width:105px;">Code</th>
+                    <th>Subject Name</th>
+                    <th style="width:85px;">Dept / Sem</th>
+                    <th style="width:125px;">Scheme (L-P-C)</th>
+                    <th style="width:140px;">Assign Faculty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${extractedSubjects.map((s, idx) => `
+                    <tr>
+                      <td style="text-align:center;">
+                        <input type="checkbox" class="sub-import-checkbox" data-idx="${idx}" ${s.checked ? 'checked' : ''} style="cursor:pointer;">
+                      </td>
+                      <td><span class="roster-roll-badge" style="font-weight:800; font-size:0.75rem;">${s.code}</span></td>
+                      <td>
+                        <input type="text" class="form-control sub-import-name" data-idx="${idx}" value="${s.name}" style="padding:4px 8px; font-size:0.8rem; font-weight:600; width:100%;">
+                      </td>
+                      <td>
+                        <span class="badge badge-${(s.department || defaultDept).toLowerCase()}" style="font-size:0.65rem;">${s.department || defaultDept}</span>
+                        <span class="badge" style="background:#f1f5f9; color:#475569; font-size:0.65rem;">S${s.semester || defaultSem}</span>
+                      </td>
+                      <td>
+                        <span class="badge" style="background:#e0e7ff; color:#3730a3; font-size:0.7rem; font-weight:700;">
+                          ${s.lectureHours || s.lectures || 3}L &middot; ${s.labHours || s.practicals || (s.hasLab ? 2 : 0)}P &middot; ${s.credits || 4}C
+                        </span>
+                      </td>
+                      <td>
+                        <select class="form-control sub-import-faculty" data-idx="${idx}" style="padding:4px 6px; font-size:0.75rem;">
+                          <option value="">Unassigned</option>
+                          ${facultyList.filter(f => f.department === (s.department || defaultDept)).map(f => `
+                            <option value="${f.id}" ${s.facultyId === f.id ? 'selected' : ''}>${f.name}</option>
+                          `).join('')}
+                        </select>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    const customFooter = `
+      <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-save-syllabus-erp" style="background:#16a34a; border-color:#16a34a; font-weight:700; display:inline-flex; align-items:center; gap:6px;" ${extractedSubjects.filter(s => s.checked).length === 0 ? 'disabled' : ''}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+        Save ${extractedSubjects.filter(s => s.checked).length > 0 ? `${extractedSubjects.filter(s => s.checked).length} Subjects` : 'Subjects'} to ERP Database
+      </button>
+    `;
+
+    openModal('Upload GTU Syllabus & Register Subjects', html, null, {
+      maxWidth: '820px',
+      customFooter
+    });
+
+    bindModalEvents();
+  }
+
+  function bindModalEvents() {
+    const dropzone = document.getElementById('modal-syllabus-dropzone');
+    const fileInput = document.getElementById('modal-syllabus-file-input');
+    const clearBtn = document.getElementById('btn-modal-clear-files');
+    const startExtractBtn = document.getElementById('btn-modal-start-extract');
+    const selectAllCb = document.getElementById('modal-select-all-subs');
+    const deptSelect = document.getElementById('import-dept-select');
+    const semSelect = document.getElementById('import-sem-select');
+    const saveErpBtn = document.getElementById('btn-save-syllabus-erp');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+
+    if (deptSelect) {
+      deptSelect.onchange = (e) => {
+        defaultDept = e.target.value;
+      };
+    }
+    if (semSelect) {
+      semSelect.onchange = (e) => {
+        defaultSem = e.target.value;
+      };
+    }
+    if (cancelBtn) {
+      cancelBtn.onclick = () => closeModal();
+    }
+
+    if (dropzone && fileInput) {
+      dropzone.onclick = () => fileInput.click();
+      dropzone.ondragover = (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--color-accent)';
+        dropzone.style.background = '#f0fdf4';
+      };
+      dropzone.ondragleave = (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--border-color)';
+        dropzone.style.background = '#ffffff';
+      };
+      dropzone.ondrop = (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--border-color)';
+        dropzone.style.background = '#ffffff';
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          selectedFiles = Array.from(e.dataTransfer.files);
+          extractError = null;
+          renderImportModalUI();
+        }
+      };
+      fileInput.onchange = (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          selectedFiles = Array.from(e.target.files);
+          extractError = null;
+          renderImportModalUI();
+        }
+      };
+    }
+
+    if (clearBtn) {
+      clearBtn.onclick = () => {
+        selectedFiles = [];
+        extractedSubjects = [];
+        extractError = null;
+        renderImportModalUI();
+      };
+    }
+
+    if (startExtractBtn) {
+      startExtractBtn.onclick = async () => {
+        if (!selectedFiles || selectedFiles.length === 0) return;
+        isExtracting = true;
+        extractError = null;
+        renderImportModalUI();
+
+        try {
+          const formData = new FormData();
+          for (const f of selectedFiles) {
+            formData.append('files', f);
+          }
+          formData.append('department', defaultDept);
+          formData.append('semester', defaultSem);
+
+          const res = await apiFetch('/admin/timetable/parse-syllabus', {
+            method: 'POST',
+            body: formData
+          });
+
+          isExtracting = false;
+          if (res.success && res.subjects && res.subjects.length > 0) {
+            if (res.detectedDepartment) defaultDept = res.detectedDepartment;
+            if (res.detectedSemester) defaultSem = String(res.detectedSemester);
+
+            const existingCodes = new Set(extractedSubjects.map(s => s.code));
+            const newSubs = res.subjects.map(s => ({
+              ...s,
+              checked: true,
+              facultyId: ''
+            }));
+
+            if (extractedSubjects.length > 0) {
+              const toAppend = newSubs.filter(s => !existingCodes.has(s.code));
+              extractedSubjects = [...extractedSubjects, ...toAppend];
+            } else {
+              extractedSubjects = newSubs;
+            }
+
+            extractError = null;
+            showToast(`Extracted ${res.subjects.length} subject(s) from GTU syllabus.`, 'success');
+          } else {
+            extractError = res.error || 'No GTU teaching scheme could be identified in the uploaded file(s).';
+            showToast(extractError, 'error');
+          }
+        } catch (err) {
+          isExtracting = false;
+          extractError = err.message || 'Error extracting syllabus files.';
+          showToast(extractError, 'error');
+        }
+        renderImportModalUI();
+      };
+    }
+
+    if (selectAllCb) {
+      selectAllCb.onchange = (e) => {
+        const isChecked = e.target.checked;
+        extractedSubjects.forEach(s => { s.checked = isChecked; });
+        renderImportModalUI();
+      };
+    }
+
+    document.querySelectorAll('.sub-import-checkbox').forEach(cb => {
+      cb.onchange = (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        if (extractedSubjects[idx]) {
+          extractedSubjects[idx].checked = e.target.checked;
+          const checkedCount = extractedSubjects.filter(s => s.checked).length;
+          const saveBtn = document.getElementById('btn-save-syllabus-erp');
+          if (saveBtn) {
+            saveBtn.disabled = checkedCount === 0;
+            saveBtn.innerHTML = `
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              Save ${checkedCount > 0 ? `${checkedCount} Subjects` : 'Subjects'} to ERP Database
+            `;
+          }
+        }
+      };
+    });
+
+    document.querySelectorAll('.sub-import-name').forEach(inp => {
+      inp.oninput = (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        if (extractedSubjects[idx]) {
+          extractedSubjects[idx].name = e.target.value;
+        }
+      };
+    });
+
+    document.querySelectorAll('.sub-import-faculty').forEach(sel => {
+      sel.onchange = (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        if (extractedSubjects[idx]) {
+          extractedSubjects[idx].facultyId = e.target.value;
+        }
+      };
+    });
+
+    if (saveErpBtn) {
+      saveErpBtn.onclick = async () => {
+        const checkedSubs = extractedSubjects.filter(s => s.checked);
+        if (checkedSubs.length === 0) {
+          showToast('Please select at least one subject to import.', 'warning');
+          return;
+        }
+
+        saveErpBtn.disabled = true;
+        saveErpBtn.textContent = 'Saving to Database...';
+
+        try {
+          const payload = {
+            subjects: checkedSubs.map(s => ({
+              code: s.code,
+              name: s.name,
+              department: s.department || defaultDept,
+              semester: parseInt(s.semester || defaultSem),
+              lectureHours: s.lectureHours || s.lectures || 3,
+              labHours: s.labHours || s.practicals || (s.hasLab ? 2 : 0),
+              tutorialHours: s.tutorialHours || s.tutorials || 0,
+              credits: s.credits || 4,
+              facultyId: s.facultyId || null
+            })),
+            department: defaultDept,
+            semester: parseInt(defaultSem)
+          };
+
+          const res = await apiFetch('/admin/timetable/import-syllabus-subjects', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+
+          if (res.success) {
+            showToast(`Successfully registered ${checkedSubs.length} subject(s) in ERP database!`, 'success');
+            closeModal();
+            await renderDepartmentsTab();
+          } else {
+            showToast(res.error || 'Failed to save subjects to database.', 'error');
+            saveErpBtn.disabled = false;
+            saveErpBtn.textContent = 'Save Subjects to ERP Database';
+          }
+        } catch (err) {
+          showToast(err.message || 'Error saving subjects', 'error');
+          saveErpBtn.disabled = false;
+          saveErpBtn.textContent = 'Save Subjects to ERP Database';
+        }
+      };
+    }
+  }
+
+  // Initial render
+  renderImportModalUI();
+}
+
+function openSubjectRegisterModal(defaultDept = 'IT', defaultSem = '3', facultyList = []) {
   const contentHTML = `
+    <!-- Quick Auto-Fill Helper -->
+    <div style="background:#f8fafc; border:1px dashed var(--border-color); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div>
+        <div style="font-size:0.8rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          Auto-fill from GTU Syllabus PDF
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Upload syllabus PDF to auto-fill code, name, dept, sem & workload</div>
+      </div>
+      <label class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px; cursor:pointer; margin:0; white-space:nowrap;">
+        Choose PDF
+        <input type="file" id="autofill-single-syllabus" accept=".pdf" style="display:none;">
+      </label>
+    </div>
+
     <div class="form-group">
       <label for="subj-code">Subject Code</label>
-      <input type="text" class="form-control" name="code" id="subj-code" placeholder="e.g. IT402" required>
+      <input type="text" class="form-control" name="code" id="subj-code" placeholder="e.g. DI03016061" required>
     </div>
     <div class="form-group">
       <label for="subj-name">Subject Name</label>
-      <input type="text" class="form-control" name="name" id="subj-name" placeholder="e.g. Computer Networks" required>
+      <input type="text" class="form-control" name="name" id="subj-name" placeholder="e.g. Operating Systems" required>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label for="subj-dept">Department</label>
         <select class="form-control" name="department" id="subj-dept">
-          <option value="IT">IT</option>
-          <option value="CE">CE</option>
-          <option value="ME">ME</option>
-          <option value="CH">CH</option>
-          <option value="EE">EE</option>
+          <option value="IT" ${defaultDept === 'IT' ? 'selected' : ''}>IT</option>
+          <option value="CE" ${defaultDept === 'CE' ? 'selected' : ''}>CE</option>
+          <option value="ME" ${defaultDept === 'ME' ? 'selected' : ''}>ME</option>
+          <option value="CH" ${defaultDept === 'CH' ? 'selected' : ''}>CH</option>
+          <option value="EE" ${defaultDept === 'EE' ? 'selected' : ''}>EE</option>
         </select>
       </div>
       <div class="form-group">
         <label for="subj-sem">Semester</label>
         <select class="form-control" name="semester" id="subj-sem">
-          <option value="1">Semester 1</option>
-          <option value="2">Semester 2</option>
-          <option value="3">Semester 3</option>
-          <option value="4" selected>Semester 4</option>
-          <option value="5">Semester 5</option>
-          <option value="6">Semester 6</option>
+          <option value="1" ${String(defaultSem) === '1' ? 'selected' : ''}>Semester 1</option>
+          <option value="2" ${String(defaultSem) === '2' ? 'selected' : ''}>Semester 2</option>
+          <option value="3" ${String(defaultSem) === '3' ? 'selected' : ''}>Semester 3</option>
+          <option value="4" ${String(defaultSem) === '4' ? 'selected' : ''}>Semester 4</option>
+          <option value="5" ${String(defaultSem) === '5' ? 'selected' : ''}>Semester 5</option>
+          <option value="6" ${String(defaultSem) === '6' ? 'selected' : ''}>Semester 6</option>
         </select>
       </div>
+    </div>
+
+    <!-- Teaching Scheme / Workload Matrix -->
+    <div style="background:#f8fafc; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:14px;">
+      <div style="font-size:0.78rem; font-weight:700; color:var(--text-secondary); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Teaching Scheme & Credits</div>
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
+        <div class="form-group" style="margin:0;">
+          <label for="subj-lec" style="font-size:0.75rem; margin-bottom:2px;">Lectures (L)</label>
+          <input type="number" class="form-control" name="lectureHours" id="subj-lec" min="0" max="15" value="3" style="font-size:0.85rem; padding:4px 8px;">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="subj-lab" style="font-size:0.75rem; margin-bottom:2px;">Practical (P)</label>
+          <input type="number" class="form-control" name="labHours" id="subj-lab" min="0" max="15" value="2" style="font-size:0.85rem; padding:4px 8px;">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="subj-tut" style="font-size:0.75rem; margin-bottom:2px;">Tutorial (T)</label>
+          <input type="number" class="form-control" name="tutorialHours" id="subj-tut" min="0" max="10" value="0" style="font-size:0.85rem; padding:4px 8px;">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="subj-credits" style="font-size:0.75rem; margin-bottom:2px;">Credits (C)</label>
+          <input type="number" class="form-control" name="credits" id="subj-credits" min="0" max="20" value="4" style="font-size:0.85rem; padding:4px 8px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- Assigned Faculty (Optional) -->
+    <div class="form-group">
+      <label for="subj-faculty">Assigned Faculty (Optional)</label>
+      <select class="form-control" name="facultyId" id="subj-faculty">
+        <option value="">-- Unassigned --</option>
+        ${(facultyList || []).map(f => `<option value="${f.id}">${f.name} (${f.department || 'Faculty'})</option>`).join('')}
+      </select>
     </div>
   `;
 
@@ -579,7 +1445,12 @@ function openSubjectRegisterModal() {
       code: formData.get('code').toUpperCase(),
       name: formData.get('name'),
       department: formData.get('department'),
-      semester: parseInt(formData.get('semester'))
+      semester: parseInt(formData.get('semester')),
+      lectureHours: parseInt(formData.get('lectureHours') || '3'),
+      labHours: parseInt(formData.get('labHours') || '2'),
+      tutorialHours: parseInt(formData.get('tutorialHours') || '0'),
+      credits: parseInt(formData.get('credits') || '4'),
+      facultyId: formData.get('facultyId') || null
     };
 
     const res = await apiFetch('/admin/subjects', {
@@ -594,9 +1465,53 @@ function openSubjectRegisterModal() {
     }
     return false;
   });
+
+  // Attach quick autofill listener
+  const autofillInput = document.getElementById('autofill-single-syllabus');
+  if (autofillInput) {
+    autofillInput.onchange = async (e) => {
+      if (!e.target.files || !e.target.files[0]) return;
+      const file = e.target.files[0];
+      const formData = new FormData();
+      formData.append('files', file);
+      const currDept = document.getElementById('subj-dept')?.value || defaultDept;
+      const currSem = document.getElementById('subj-sem')?.value || defaultSem;
+      formData.append('department', currDept);
+      formData.append('semester', currSem);
+
+      showToast(`Analyzing ${file.name}...`, 'info');
+      try {
+        const res = await apiFetch('/admin/timetable/parse-syllabus', {
+          method: 'POST',
+          body: formData
+        });
+        if (res.success && res.subjects && res.subjects.length > 0) {
+          const sub = res.subjects[0];
+          if (sub.code) document.getElementById('subj-code').value = sub.code;
+          if (sub.name) document.getElementById('subj-name').value = sub.name;
+          if (res.detectedDepartment) document.getElementById('subj-dept').value = res.detectedDepartment;
+          if (res.detectedSemester) document.getElementById('subj-sem').value = String(res.detectedSemester);
+          if (sub.lectureHours !== undefined && document.getElementById('subj-lec')) document.getElementById('subj-lec').value = sub.lectureHours;
+          if (sub.labHours !== undefined && document.getElementById('subj-lab')) document.getElementById('subj-lab').value = sub.labHours;
+          if (sub.tutorialHours !== undefined && document.getElementById('subj-tut')) document.getElementById('subj-tut').value = sub.tutorialHours;
+          if (sub.credits !== undefined && document.getElementById('subj-credits')) document.getElementById('subj-credits').value = sub.credits;
+          showToast(`Auto-filled: ${sub.name} (${sub.code})`, 'success');
+        } else {
+          showToast(res.error || 'Could not parse syllabus file.', 'error');
+        }
+      } catch (err) {
+        showToast(err.message || 'Error parsing syllabus', 'error');
+      }
+    };
+  }
 }
 
-function openSubjectEditModal(sub) {
+function openSubjectEditModal(sub, facultyList = []) {
+  const lec = sub.lectureHours !== undefined && sub.lectureHours !== null ? sub.lectureHours : (sub.type === 'practical' ? 0 : 3);
+  const lab = sub.labHours !== undefined && sub.labHours !== null ? sub.labHours : (sub.type === 'theory' ? 0 : 2);
+  const tut = sub.tutorialHours !== undefined && sub.tutorialHours !== null ? sub.tutorialHours : 0;
+  const cred = sub.credits !== undefined && sub.credits !== null ? sub.credits : (lec + Math.round(lab / 2));
+
   const contentHTML = `
     <div class="form-group">
       <label for="subj-code">Subject Code</label>
@@ -629,6 +1544,38 @@ function openSubjectEditModal(sub) {
         </select>
       </div>
     </div>
+
+    <!-- Teaching Scheme / Workload Matrix -->
+    <div style="background:#f8fafc; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:14px;">
+      <div style="font-size:0.78rem; font-weight:700; color:var(--text-secondary); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Teaching Scheme & Credits</div>
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
+        <div class="form-group" style="margin:0;">
+          <label for="subj-lec" style="font-size:0.75rem; margin-bottom:2px;">Lectures (L)</label>
+          <input type="number" class="form-control" name="lectureHours" id="subj-lec" min="0" max="15" value="${lec}" style="font-size:0.85rem; padding:4px 8px;">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="subj-lab" style="font-size:0.75rem; margin-bottom:2px;">Practical (P)</label>
+          <input type="number" class="form-control" name="labHours" id="subj-lab" min="0" max="15" value="${lab}" style="font-size:0.85rem; padding:4px 8px;">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="subj-tut" style="font-size:0.75rem; margin-bottom:2px;">Tutorial (T)</label>
+          <input type="number" class="form-control" name="tutorialHours" id="subj-tut" min="0" max="10" value="${tut}" style="font-size:0.85rem; padding:4px 8px;">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="subj-credits" style="font-size:0.75rem; margin-bottom:2px;">Credits (C)</label>
+          <input type="number" class="form-control" name="credits" id="subj-credits" min="0" max="20" value="${cred}" style="font-size:0.85rem; padding:4px 8px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- Assigned Faculty (Optional) -->
+    <div class="form-group">
+      <label for="subj-faculty">Assigned Faculty (Optional)</label>
+      <select class="form-control" name="facultyId" id="subj-faculty">
+        <option value="">-- Unassigned --</option>
+        ${(facultyList || []).map(f => `<option value="${f.id}" ${sub.facultyId === f.id ? 'selected' : ''}>${f.name} (${f.department || 'Faculty'})</option>`).join('')}
+      </select>
+    </div>
   `;
 
   openModal(`Modify: ${sub.name}`, contentHTML, async (formData) => {
@@ -636,7 +1583,12 @@ function openSubjectEditModal(sub) {
       code: formData.get('code').toUpperCase(),
       name: formData.get('name'),
       department: formData.get('department'),
-      semester: parseInt(formData.get('semester'))
+      semester: parseInt(formData.get('semester')),
+      lectureHours: parseInt(formData.get('lectureHours') || '3'),
+      labHours: parseInt(formData.get('labHours') || '2'),
+      tutorialHours: parseInt(formData.get('tutorialHours') || '0'),
+      credits: parseInt(formData.get('credits') || '4'),
+      facultyId: formData.get('facultyId') || null
     };
 
     const res = await apiFetch(`/admin/subjects/${sub.id}`, {
@@ -1475,8 +2427,12 @@ async function renderTimetableTab() {
           <!-- Populated dynamically -->
         </select>
       </div>
-      <div style="display:flex; gap:8px; margin-left:auto; align-items:flex-end;">
+      <div style="display:flex; gap:8px; margin-left:auto; align-items:flex-end; flex-wrap:wrap;">
         <button class="btn btn-secondary" id="btn-refresh-grid">Refresh Grid</button>
+        <button class="btn btn-secondary" id="btn-open-syllabus-uploader" style="display:inline-flex; align-items:center; gap:6px; font-weight:600;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          Upload GTU Syllabus
+        </button>
         <button class="btn btn-primary" id="btn-open-auto-generator" style="background:linear-gradient(135deg, #4338ca 0%, #6366f1 100%); border:none; box-shadow:0 3px 10px rgba(79, 70, 229, 0.35); display:inline-flex; align-items:center; gap:6px;">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
           Auto Timetable Builder
@@ -1519,16 +2475,24 @@ async function renderTimetableTab() {
   ];
 
   function drawTimetableGrid() {
-    const dept = document.getElementById('tt-dept-select').value;
-    const sem = parseInt(document.getElementById('tt-sem-select').value);
-    const div = document.getElementById('tt-div-select').value;
+    const deptEl = document.getElementById('tt-dept-select');
+    const semEl = document.getElementById('tt-sem-select');
+    const divEl = document.getElementById('tt-div-select');
+    const titleLabel = document.getElementById('timetable-title-label');
+    const gridElement = document.getElementById('timetable-cells-grid');
 
-    document.getElementById('timetable-title-label').textContent = `${dept} Department — Semester ${sem} (Batch ${div}) Academic Schedule`;
+    if (!deptEl || !semEl || !divEl || !gridElement) return;
+
+    const dept = deptEl.value;
+    const sem = parseInt(semEl.value);
+    const div = divEl.value;
+
+    if (titleLabel) {
+      titleLabel.textContent = `${dept} Department — Semester ${sem} (Batch ${div}) Academic Schedule`;
+    }
 
     // Filter elements in timetable matching selectors (lectures apply to all batches of the semester)
     const gridData = timetable.filter(c => c.department === dept && c.semester === sem && (c.division === div || c.type === 'lecture' || !c.type));
-
-    const gridElement = document.getElementById('timetable-cells-grid');
 
     // Header top row (Days)
     let gridHTML = `<div class="timetable-header-cell">Period</div>`;
@@ -1556,7 +2520,7 @@ async function renderTimetableTab() {
           const sub = subjects.find(s => s.id === cellVal.subjectId);
           const fac = users.find(u => u.id === cellVal.facultyId);
           const isStart = p.num === cellVal.period;
-          const typeLabel = cellVal.type === 'lab' ? '🔬 Lab' : cellVal.type === 'tutorial' ? '📖 Tut' : '';
+          const typeLabel = cellVal.type === 'lab' ? '[Lab]' : cellVal.type === 'tutorial' ? '[Tut]' : '';
           const batchBadge = (cellVal.type === 'lecture' || cellVal.division === 'ALL')
             ? `<span style="font-size:0.65rem; font-weight:normal; background:#f1f5f9; color:#475569; padding:2px 5px; border-radius:3px; margin-left:4px;">Whole Class</span>`
             : `<span style="font-size:0.65rem; font-weight:normal; background:#dbeafe; color:#1e40af; padding:2px 5px; border-radius:3px; margin-left:4px;">Batch ${cellVal.division}</span>`;
@@ -1679,7 +2643,7 @@ async function renderTimetableTab() {
   });
   document.getElementById('tt-div-select').addEventListener('change', drawTimetableGrid);
   document.getElementById('btn-refresh-grid').addEventListener('click', drawTimetableGrid);
-  document.getElementById('btn-open-auto-generator').addEventListener('click', () => {
+  const openStudioHelper = (tab = 'criteria') => {
     const dept = document.getElementById('tt-dept-select').value;
     const sem = parseInt(document.getElementById('tt-sem-select').value);
     const configuredBatches = semesterConfigs[sem] || 2;
@@ -1691,6 +2655,7 @@ async function renderTimetableTab() {
       batches: batchNames,
       subjects: subjects,
       facultyList: users,
+      initialTab: tab,
       onApplied: async () => {
         const newTtRes = await apiFetch('/admin/timetable');
         if (newTtRes.success) {
@@ -1700,7 +2665,13 @@ async function renderTimetableTab() {
         }
       }
     });
-  });
+  };
+
+  document.getElementById('btn-open-auto-generator').addEventListener('click', () => openStudioHelper('criteria'));
+  const syllabusBtn = document.getElementById('btn-open-syllabus-uploader');
+  if (syllabusBtn) {
+    syllabusBtn.addEventListener('click', () => openStudioHelper('syllabus'));
+  }
 
   // Resize listener for table grid responsiveness
   window.addEventListener('resize', drawTimetableGrid);

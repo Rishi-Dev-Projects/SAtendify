@@ -960,6 +960,10 @@ def get_admin_attendance_logs():
     Returns all attendance logs.
     """
     try:
+        from cache_service import get_cached_subjects, get_cached_faculty_names
+        subs_dict = get_cached_subjects(db)
+        fac_dict = get_cached_faculty_names(db)
+
         logs_ref = db.collection('attendance').stream()
         
         results = []
@@ -968,13 +972,8 @@ def get_admin_attendance_logs():
             sub_id = log.get('subjectId')
             faculty_id = log.get('facultyId')
             
-            # Get Subject Metadata details
-            sub_snap = db.collection('subjects').document(sub_id).get()
-            sub_info = sub_snap.to_dict() if sub_snap.exists else {"name": "Unknown", "code": ""}
-            
-            # Get Faculty Metadata details
-            fac_snap = db.collection('users').document(faculty_id).get()
-            fac_info = fac_snap.to_dict() if fac_snap.exists else {"name": "Unknown"}
+            sub_info = subs_dict.get(sub_id, {"name": "Unknown", "code": ""})
+            faculty_name = fac_dict.get(faculty_id, "Unknown")
             
             records = log.get('records', [])
             total_count = len(records)
@@ -992,7 +991,7 @@ def get_admin_attendance_logs():
                 "division": log.get('division'),
                 "subjectName": sub_info.get('name'),
                 "subjectCode": sub_info.get('code'),
-                "facultyName": fac_info.get('name'),
+                "facultyName": faculty_name,
                 "department": log.get('department', 'GEN'),
                 "presentCount": present_count,
                 "totalCount": total_count,

@@ -156,9 +156,13 @@ export async function apiFetch(endpoint, options = {}) {
   // 2. PRODUCTION MODE: real HTTP calls to the backend
   const token = getAuthToken();
   const headers = {
-    'Content-Type': 'application/json',
     ...(options.headers || {})
   };
+
+  // Only set Content-Type to JSON if body is NOT FormData
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -499,6 +503,57 @@ async function handleMockApi(endpoint, options) {
     });
     setDB('sat_timetable', tt);
     return { success: true, message: `Successfully applied ${slots.length} timetable slots.`, data: slots };
+  }
+
+  // -- PARSE GTU SYLLABUS MOCK HANDLER --
+  if (endpoint === '/admin/timetable/parse-syllabus' && method === 'POST') {
+    const sem = (body && body.semester) || 5;
+    const dept = (body && body.department) || 'IT';
+    return {
+      success: true,
+      fileName: (body && body.fileName) || 'GTU_Scheme_Syllabus.pdf',
+      detectedSemester: parseInt(sem),
+      detectedDepartment: dept,
+      totalSubjects: 5,
+      subjects: [
+        { code: `DI0${sem}016011`, name: 'Artificial Intelligence & Prompt Engineering', lectureHours: 3, labHours: 2, tutorialHours: 0, hasLab: true, credits: 4, semester: parseInt(sem), department: dept },
+        { code: `DI0${sem}016021`, name: 'AI Product Design', lectureHours: 3, labHours: 2, tutorialHours: 0, hasLab: true, credits: 4, semester: parseInt(sem), department: dept },
+        { code: `DI0${sem}016031`, name: 'Cloud and Data Center Technology', lectureHours: 4, labHours: 2, tutorialHours: 0, hasLab: true, credits: 5, semester: parseInt(sem), department: dept },
+        { code: `DI0${sem}016061`, name: 'Structured Programming with C', lectureHours: 3, labHours: 4, tutorialHours: 0, hasLab: true, credits: 5, semester: parseInt(sem), department: dept },
+        { code: `DI0${sem}000341`, name: 'Minor Project', lectureHours: 0, labHours: 4, tutorialHours: 0, hasLab: true, credits: 2, semester: parseInt(sem), department: dept }
+      ]
+    };
+  }
+
+  // -- IMPORT SYLLABUS SUBJECTS MOCK HANDLER --
+  if (endpoint === '/admin/timetable/import-syllabus-subjects' && method === 'POST') {
+    const { subjects, department, semester } = body;
+    let satSubs = getDB('sat_subjects') || [];
+    let imported = [];
+    (subjects || []).forEach(s => {
+      const subId = `sub-${department.toLowerCase()}${semester}-${String(s.code).toLowerCase()}`;
+      const existingIdx = satSubs.findIndex(sub => sub.id === subId || sub.code === s.code);
+      const subObj = {
+        id: subId,
+        code: s.code,
+        name: s.name,
+        department: s.department || department,
+        semester: parseInt(s.semester || semester),
+        lectureHours: parseInt(s.lectureHours || 3),
+        labHours: parseInt(s.labHours || 2),
+        tutorialHours: parseInt(s.tutorialHours || 0),
+        credits: parseInt(s.credits || 4),
+        facultyId: s.facultyId || null
+      };
+      if (existingIdx !== -1) {
+        satSubs[existingIdx] = { ...satSubs[existingIdx], ...subObj };
+      } else {
+        satSubs.push(subObj);
+      }
+      imported.push(subObj);
+    });
+    setDB('sat_subjects', satSubs);
+    return { success: true, message: `Successfully imported ${imported.length} syllabus subjects.`, totalImported: imported.length, subjects: imported };
   }
 
   // -- SEMESTER CONFIG ENDPOINT --
