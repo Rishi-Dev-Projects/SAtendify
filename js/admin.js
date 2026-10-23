@@ -3,6 +3,7 @@ import { guardRoute } from './auth.js';
 import { initializeChrome } from './main.js';
 import { apiFetch, showToast } from './api.js';
 import { openTimetableBuilderStudio } from './timetableBuilder.js';
+import { renderReportsCenter } from './reports.js';
 
 // Route guard validation
 const user = guardRoute(['admin']);
@@ -92,6 +93,9 @@ async function initAdminDashboard(forcedTab = null) {
     case 'attendance':
       await renderAttendanceTab();
       break;
+    case 'reports':
+      await renderReportsCenter('admin');
+      break;
     default:
       await renderOverviewTab();
   }
@@ -107,6 +111,7 @@ function getPageTitleForTab(tab) {
     case 'users': return 'Academic Registers';
     case 'timetable': return 'Timetable';
     case 'attendance': return 'Attendance Logs';
+    case 'reports': return 'Reports Center';
     default: return 'Dashboard';
   }
 }

@@ -2,6 +2,7 @@
 import { guardRoute } from './auth.js';
 import { initializeChrome } from './main.js';
 import { apiFetch, showToast } from './api.js';
+import { renderReportsCenter } from './reports.js';
 
 // Route guard validation
 const user = guardRoute(['faculty']);
@@ -69,6 +70,9 @@ async function initFacultyDashboard(forcedTab = null) {
     case 'timetable-weekly':
       await renderWeeklyTimetable();
       break;
+    case 'reports':
+      await renderReportsCenter('faculty');
+      break;
     default:
       await renderTodayTimetable();
   }
@@ -81,6 +85,7 @@ function getPageTitleForTab(tab) {
     case 'students': return "Students";
     case 'history': return "Attendance Logs";
     case 'timetable-weekly': return "Weekly Timetable";
+    case 'reports': return "Reports Center";
     default: return "Dashboard";
   }
 }

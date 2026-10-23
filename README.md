@@ -25,6 +25,15 @@
 - **Indexed Registers & Visual Meters**: Clean table indexing (`#`), monospace timestamps, subject code tags, and percentage progress fill bars across all consoles.
 - **SVG Design System**: Modern dark-gradient themes (`linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)`), glassmorphism, responsive drawer navigation, zero emojis, and pure SVG icons.
 
+### 📋 Reports & Parent Communication Center
+- **Daily Lecture-wise Absentee Report**: Aggregates period-by-period class rosters for selected dates. Provides one-click **"Copy WhatsApp Notice"** generating formatted plain-text notices for parent communication with zero manual transcription.
+- **Monthly Low-Attendance Audit (< 75%)**: Scans student cohorts against the standard 75% threshold. Sorts lowest attendance first, calculates cohort average, and supports calendar-month and cumulative academic period evaluations.
+- **Subject-wise Attendance Deficiency Audit**: Evaluates attendance per subject in the curriculum, identifying individual subjects where students fall below 75% to prevent exam detention.
+- **Individual Student Dossier & Printable Parent Notice**: Generates institutional A4 print-ready notices with academic letterhead, student credentials, subject-wise attendance registry, formal warning declarations, and blank physical signature lines for Student, Parent/Guardian, Faculty Mentor, and HOD.
+- **Zero-Session Handling Policy**: When zero sessions have been conducted for a student or cohort in an evaluated period, the Reports Center explicitly reports "No Attendance Data" rather than inflating results to 100% or incorrectly penalizing students.
+- **Formula Injection Protected CSV Export**: Sanitizes dangerous formula prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) with single quotes to protect institutional computers from spreadsheet macro injection.
+- **Strict Role-Based Scoping & Performance**: Admin has institutional scope, HOD is strictly restricted to their department, Faculty is limited to assigned subjects/classes, and Students are excluded. Uses bounded queries and batch reads (`db.get_all()`) to eliminate N+1 queries.
+
 ---
 
 ## 🚀 Getting Started & Local Setup
@@ -78,8 +87,10 @@ SAtendify/
 │   │   ├── auth.py        # Authentication & profile resolution API routes
 │   │   ├── faculty.py     # Faculty timetable, roster marking, & proxy API routes
 │   │   ├── hod.py         # HOD department analytics & assignment API routes
-│   │   └── student.py     # Student attendance metrics & timetable API routes
+│   │   ├── student.py     # Student attendance metrics & timetable API routes
+│   │   └── reports.py     # Reports Center & parent notice generation routes
 │   ├── app.py             # Flask application entry point
+│   ├── cache_service.py   # In-memory cached metadata service (zero N+1 queries)
 │   ├── config.py          # Firestore database & Firebase Admin SDK initialization
 │   ├── decorators.py      # Bearer token verification & role authorization middleware
 │   ├── seed.py            # Initial database seeder script
@@ -92,6 +103,7 @@ SAtendify/
 │   ├── auth.js            # Authentication sessions router & Roll No + DOB validator
 │   ├── api.js             # API fetch client wrapper & toast notifications manager
 │   ├── main.js            # Navigation drawer & chrome header manager
+│   ├── reports.js         # Reports Center & Parent Notice generator controller
 │   ├── admin.js           # Admin console controller
 │   ├── hod.js             # HOD console controller
 │   ├── faculty.js         # Faculty console & proxy management controller

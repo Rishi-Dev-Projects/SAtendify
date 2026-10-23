@@ -3,6 +3,7 @@ import { guardRoute } from './auth.js';
 import { initializeChrome } from './main.js';
 import { apiFetch, showToast } from './api.js';
 import { openTimetableBuilderStudio } from './timetableBuilder.js';
+import { renderReportsCenter } from './reports.js';
 
 // Route guard validation
 const user = guardRoute(['hod']);
@@ -86,6 +87,9 @@ async function initHODDashboard(forcedTab = null) {
     case 'attendance':
       await renderAttendanceTab();
       break;
+    case 'reports':
+      await renderReportsCenter('hod');
+      break;
     default:
       await renderOverviewTab();
   }
@@ -100,6 +104,7 @@ function getPageTitleForTab(tab) {
     case 'timetable': return 'Timetable';
     case 'take-attendance': return 'Take Attendance';
     case 'attendance': return 'Attendance Logs';
+    case 'reports': return 'Reports Center';
     default: return 'Dashboard';
   }
 }

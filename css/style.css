@@ -2336,5 +2336,103 @@ button, input, select, textarea {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
+/* =========================================
+   Reports Center & Print Notice Styles
+   ========================================= */
+.reports-center-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+  }
+
+  /* Hide app chrome during printing */
+  #sidebar-container,
+  .app-sidebar,
+  .sidebar-backdrop,
+  #header-container,
+  .app-header,
+  .reports-header-row,
+  .reports-filter-panel,
+  .modal-top-bar,
+  .btn,
+  button,
+  .app-footer {
+    display: none !important;
+  }
+
+  .app-container,
+  .app-main,
+  #dashboard-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+  }
+
+  /* When printable modal is open, hide background reports container to prevent bleeding */
+  body.printing-parent-notice .reports-center-container,
+  #reports-modal-overlay:not([style*="display: none"]) ~ .reports-center-container {
+    display: none !important;
+  }
+
+  #reports-modal-overlay[style*="display: none"] {
+    display: none !important;
+  }
+
+  #reports-modal-overlay:not([style*="display: none"]) {
+    position: static !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  .reports-modal-container {
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #printable-parent-notice {
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  table {
+    page-break-inside: auto !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  .official-college-header {
+    page-break-inside: avoid !important;
+    margin-bottom: 20px !important;
+  }
+
+  .physical-signature-section {
+    page-break-inside: avoid !important;
+    margin-top: 36px !important;
+  }
+}
+
+
 
 

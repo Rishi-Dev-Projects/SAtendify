@@ -37,6 +37,7 @@ function renderSidebar(user, activeTab) {
       <li class="nav-item ${activeTab === 'students' ? 'active' : ''}"><a href="admin.html?tab=students">Students</a></li>
       <li class="nav-item ${activeTab === 'timetable' ? 'active' : ''}"><a href="admin.html?tab=timetable">Timetable</a></li>
       <li class="nav-item ${activeTab === 'attendance' ? 'active' : ''}"><a href="admin.html?tab=attendance">Attendance Logs</a></li>
+      <li class="nav-item ${activeTab === 'reports' ? 'active' : ''}"><a href="admin.html?tab=reports">Reports Center</a></li>
     `;
   } else if (user.role === 'hod') {
     linksHTML = `
@@ -48,6 +49,7 @@ function renderSidebar(user, activeTab) {
       <li class="nav-item ${activeTab === 'timetable' ? 'active' : ''}"><a href="hod.html?tab=timetable">Timetable</a></li>
       <li class="nav-item ${activeTab === 'take-attendance' ? 'active' : ''}"><a href="hod.html?tab=take-attendance">Take Attendance</a></li>
       <li class="nav-item ${activeTab === 'attendance' ? 'active' : ''}"><a href="hod.html?tab=attendance">Attendance Logs</a></li>
+      <li class="nav-item ${activeTab === 'reports' ? 'active' : ''}"><a href="hod.html?tab=reports">Reports Center</a></li>
     `;
   } else if (user.role === 'faculty') {
     linksHTML = `
@@ -57,6 +59,7 @@ function renderSidebar(user, activeTab) {
       <li class="nav-item ${activeTab === 'students' ? 'active' : ''}"><a href="faculty.html?tab=students">Students</a></li>
       <li class="nav-item ${activeTab === 'history' ? 'active' : ''}"><a href="faculty.html?tab=history">Attendance Logs</a></li>
       <li class="nav-item ${activeTab === 'timetable-weekly' ? 'active' : ''}"><a href="faculty.html?tab=timetable-weekly">Weekly Timetable</a></li>
+      <li class="nav-item ${activeTab === 'reports' ? 'active' : ''}"><a href="faculty.html?tab=reports">Reports Center</a></li>
     `;
   } else if (user.role === 'student') {
     linksHTML = `
