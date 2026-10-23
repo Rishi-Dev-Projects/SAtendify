@@ -1,3 +1,4 @@
+import re
 from flask import Blueprint, request, jsonify, g
 from firebase_admin import auth
 from config import db
@@ -63,6 +64,7 @@ def get_profile():
 def update_my_profile():
     """
     Updates profile details (Name, Email, Mobile) for any authenticated user including Students.
+    Enforces strict input validation to prevent oversized payloads or malformed contact numbers.
     """
     uid = g.current_user.get('uid')
     data = request.get_json() or {}
@@ -71,8 +73,34 @@ def update_my_profile():
     email = (data.get('email') or '').strip().lower()
     mobile = (data.get('mobile') or '').strip()
 
+    # 1. Validate Name
     if not name:
         return jsonify({"success": False, "error": "Full Name is required."}), 400
+    if len(name) > 100:
+        return jsonify({"success": False, "error": "Full Name cannot exceed 100 characters."}), 400
+
+    # 2. Validate Email
+    if email:
+        if len(email) > 120:
+            return jsonify({"success": False, "error": "Email address cannot exceed 120 characters."}), 400
+        if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            return jsonify({"success": False, "error": "Invalid email address format."}), 400
+
+    # 3. Validate Mobile Number (Strict 10-15 digits, max 16 chars)
+    if mobile:
+        if len(mobile) > 16:
+            return jsonify({"success": False, "error": "Mobile number cannot exceed 16 characters."}), 400
+        if not re.match(r'^\+?[0-9\s-]+$', mobile):
+            return jsonify({
+                "success": False, 
+                "error": "Mobile number contains invalid characters. Use standard digits with optional '+' country code prefix."
+            }), 400
+        digits = re.sub(r'\D', '', mobile)
+        if len(digits) < 10 or len(digits) > 15:
+            return jsonify({
+                "success": False, 
+                "error": f"Invalid mobile number ({len(digits)} digits). Must contain between 10 and 15 digits (e.g. +91 9876543210)."
+            }), 400
 
     try:
         user_ref = db.collection('users').document(uid)
@@ -81,6 +109,11 @@ def update_my_profile():
             update_data["email"] = email
         if mobile:
             update_data["mobile"] = mobile
+            update_data["phone"] = mobile
+        elif 'mobile' in data:
+            # Explicitly cleared
+            update_data["mobile"] = ""
+            update_data["phone"] = ""
 
         user_ref.update(update_data)
 

@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, g
+from flask import Flask, jsonify, g, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -17,12 +17,14 @@ from blueprints.admin import admin_bp
 from blueprints.hod import hod_bp
 from blueprints.faculty import faculty_bp
 from blueprints.student import student_bp
+from blueprints.reports import reports_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(admin_bp, url_prefix='/api/admin')
 app.register_blueprint(hod_bp, url_prefix='/api/hod')
 app.register_blueprint(faculty_bp, url_prefix='/api/faculty')
 app.register_blueprint(student_bp, url_prefix='/api/student')
+app.register_blueprint(reports_bp, url_prefix='/api/reports')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -32,16 +34,33 @@ def health_check():
 def serve_index():
     return app.send_static_file('index.html')
 
+from rate_limiter import rate_limiter
 import time
 
 @app.before_request
-def start_request_timer():
+def before_request_hook():
     g.req_start_time = time.time()
+    
+    # Enforce application-wide rate limits across all API endpoints
+    rate_resp, meta = rate_limiter.check_rate_limit(request)
+    if rate_resp is not None:
+        return rate_resp
+    g.rate_limit_meta = meta
 
 @app.after_request
-def add_performance_headers(response):
+def add_performance_and_rate_limit_headers(response):
     response.headers['Vary'] = 'Accept-Encoding'
     response.headers['X-Content-Type-Options'] = 'nosniff'
+    
+    # Inject standard rate limit headers
+    meta = getattr(g, 'rate_limit_meta', None)
+    if meta:
+        response.headers['X-RateLimit-Limit'] = str(meta['limit'])
+        response.headers['X-RateLimit-Remaining'] = str(meta['remaining'])
+        response.headers['X-RateLimit-Reset'] = str(meta['reset'])
+        if meta.get('retry_after'):
+            response.headers['Retry-After'] = str(meta['retry_after'])
+
     if hasattr(g, 'req_start_time'):
         total_dur = round((time.time() - g.req_start_time) * 1000, 2)
         auth_dur = getattr(g, 'auth_duration', None)
@@ -68,6 +87,10 @@ def forbidden(e):
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"success": False, "error": "Resource or endpoint not found."}), 404
+
+@app.errorhandler(429)
+def rate_limit_exceeded(e):
+    return jsonify({"success": False, "error": "Rate limit exceeded. Too many requests. Please slow down and try again shortly."}), 429
 
 @app.errorhandler(500)
 def server_error(e):

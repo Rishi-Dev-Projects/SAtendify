@@ -125,7 +125,7 @@ function renderProfileData(profile) {
       <div class="field-icon">
         ${f.icon}
       </div>
-      <div>
+      <div style="min-width: 0; overflow: hidden;">
         <div class="field-title">${f.label}</div>
         <div class="field-text">${f.value}</div>
       </div>
@@ -174,6 +174,35 @@ function setupEditModal(profile) {
       if (!newName) {
         showToast('Full Name is required.', 'error');
         return;
+      }
+
+      if (newName.length > 100) {
+        showToast('Full Name cannot exceed 100 characters.', 'error');
+        return;
+      }
+
+      if (newEmail) {
+        if (newEmail.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+          showToast('Please enter a valid email address.', 'error');
+          return;
+        }
+      }
+
+      if (newMobile) {
+        if (newMobile.length > 16) {
+          showToast('Mobile number cannot exceed 16 characters.', 'error');
+          return;
+        }
+        const validPhonePattern = /^\+?[0-9\s-]{10,16}$/;
+        if (!validPhonePattern.test(newMobile)) {
+          showToast('Mobile number contains invalid characters. Use digits with optional "+" prefix.', 'error');
+          return;
+        }
+        const digits = newMobile.replace(/\D/g, '');
+        if (digits.length < 10 || digits.length > 15) {
+          showToast(`Invalid mobile number (${digits.length} digits). Must contain between 10 and 15 digits (e.g. +91 9876543210).`, 'error');
+          return;
+        }
       }
 
       const saveBtn = document.getElementById('btn-save-profile');

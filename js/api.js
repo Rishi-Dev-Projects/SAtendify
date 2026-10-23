@@ -185,6 +185,14 @@ export async function apiFetch(endpoint, options = {}) {
       return { success: false, error: 'Session expired or unauthorised.' };
     }
 
+    if (response.status === 429) {
+      const payload = await response.json().catch(() => ({}));
+      const retryAfter = response.headers.get('Retry-After') || payload.retryAfter || 'a few';
+      const msg = payload.error || `Rate limit exceeded: Too many requests. Please wait ${retryAfter}s before trying again.`;
+      showToast(msg, 'warning');
+      return { success: false, error: msg, rateLimited: true, retryAfter };
+    }
+
     const payload = await response.json();
     if (!payload.success) {
       showToast(payload.error || 'Server error', 'error');
@@ -217,6 +225,14 @@ async function handleMockApi(endpoint, options) {
     } else if (method === 'PUT') {
       if (body && body.name) currUser.name = body.name;
       if (body && body.email) currUser.email = body.email;
+      if (body && body.mobile) {
+        const mob = String(body.mobile).trim();
+        const digits = mob.replace(/\D/g, '');
+        if (mob.length > 16 || digits.length < 10 || digits.length > 15 || !/^\+?[0-9\s-]{10,16}$/.test(mob)) {
+          return { success: false, error: 'Invalid mobile number. Must contain between 10 and 15 digits.' };
+        }
+        currUser.mobile = mob;
+      }
       
       const sessionStr = localStorage.getItem('sat_session');
       if (sessionStr) {
@@ -224,6 +240,7 @@ async function handleMockApi(endpoint, options) {
           const sess = JSON.parse(sessionStr);
           sess.user.name = currUser.name;
           sess.user.email = currUser.email;
+          if (currUser.mobile) sess.user.mobile = currUser.mobile;
           localStorage.setItem('sat_session', JSON.stringify(sess));
         } catch (e) {}
       }

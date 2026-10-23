@@ -207,6 +207,16 @@ def create_user():
 
     if not name or not role:
         return jsonify({"success": False, "error": "Missing required fields (name, role)"}), 400
+
+    raw_mobile = (data.get('mobile') or data.get('phone') or '').strip()
+    if raw_mobile:
+        if len(raw_mobile) > 16:
+            return jsonify({"success": False, "error": "Mobile number cannot exceed 16 characters."}), 400
+        if not re.match(r'^\+?[0-9\s-]+$', raw_mobile):
+            return jsonify({"success": False, "error": "Mobile number contains invalid characters."}), 400
+        digits = re.sub(r'\D', '', raw_mobile)
+        if len(digits) < 10 or len(digits) > 15:
+            return jsonify({"success": False, "error": "Mobile number must contain between 10 and 15 digits."}), 400
         
     try:
         if role == 'student':
@@ -226,7 +236,8 @@ def create_user():
                 "division": data.get('division', 'A'),
                 "rollNumber": roll_no,
                 "dob": dob,
-                "mobile": data.get('mobile') or data.get('phone') or '',
+                "mobile": raw_mobile,
+                "phone": raw_mobile,
                 "status": "active",
                 "createdAt": firestore.SERVER_TIMESTAMP
             }
@@ -307,12 +318,18 @@ def handle_user_item(id):
                 update_payload['role'] = data['role']
             if 'department' in data and current_role == 'admin':
                 update_payload['department'] = data['department']
-            if 'mobile' in data:
-                update_payload['mobile'] = data['mobile']
-                update_payload['phone'] = data['mobile']
-            if 'phone' in data:
-                update_payload['phone'] = data['phone']
-                update_payload['mobile'] = data['phone']
+            if 'mobile' in data or 'phone' in data:
+                raw_mob = (data.get('mobile') or data.get('phone') or '').strip()
+                if raw_mob:
+                    if len(raw_mob) > 16:
+                        return jsonify({"success": False, "error": "Mobile number cannot exceed 16 characters."}), 400
+                    if not re.match(r'^\+?[0-9\s-]+$', raw_mob):
+                        return jsonify({"success": False, "error": "Mobile number contains invalid characters."}), 400
+                    digits = re.sub(r'\D', '', raw_mob)
+                    if len(digits) < 10 or len(digits) > 15:
+                        return jsonify({"success": False, "error": "Mobile number must contain between 10 and 15 digits."}), 400
+                update_payload['mobile'] = raw_mob
+                update_payload['phone'] = raw_mob
             if 'status' in data:
                 update_payload['status'] = data['status']
                 
